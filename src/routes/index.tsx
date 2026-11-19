@@ -65,6 +65,9 @@ import { IncidentReportsScreen } from '@/features/security/screens/IncidentRepor
 // Phase 7: Reporting, Analytics & Intelligence Hub
 import { ReportsCenterScreen } from '@/features/reports/screens/ReportsCenterScreen';
 
+// User Manual & Knowledge Base
+import { UserManualScreen } from '@/features/manual/screens/UserManualScreen';
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -176,6 +179,11 @@ export const AppRoutes: React.FC = () => {
           <Route path="/it/workflows" element={<WorkflowManagementScreen />} />
           <Route path="/it/forms" element={<DynamicFormViewerScreen />} />
           <Route path="/it/numbering" element={<DocumentNumberingScreen />} />
+
+          {/* User Manual & Knowledge Center */}
+          <Route path="/manual" element={<UserManualScreen />} />
+          <Route path="/docs" element={<Navigate to="/manual" replace />} />
+          <Route path="/help" element={<Navigate to="/manual" replace />} />
         </Route>
       </Route>
 

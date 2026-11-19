@@ -44,6 +44,7 @@ import {
   Laptop,
   ChevronsLeft,
   ChevronsRight,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -64,6 +65,7 @@ const iconMap: Record<string, React.ElementType> = {
   ShieldCheck,
   Cpu,
   BarChart3,
+  BookOpen,
 };
 
 export const AppLayout: React.FC = () => {
@@ -283,7 +285,12 @@ export const AppLayout: React.FC = () => {
 
   // Flatten searchable links for Ctrl+K Command Palette
   const searchableLinks = useMemo(() => {
-    const list: { title: string; path: string; module: string; icon?: string }[] = [];
+    const list: { title: string; path: string; module: string; icon?: string }[] = [
+      { title: 'Enterprise User Manual & Role Guides', path: '/manual', module: 'Documentation & Help', icon: 'BookOpen' },
+      { title: 'IT Administration Manual & Maintenance', path: '/manual', module: 'IT Department', icon: 'ShieldCheck' },
+      { title: 'Front Office & Check-In Guide', path: '/manual', module: 'Front Office', icon: 'Building2' },
+      { title: 'Restaurant POS & Kitchen Guide', path: '/manual', module: 'Restaurant & POS', icon: 'UtensilsCrossed' }
+    ];
     for (const m of menus) {
       if (m.path && (!m.children || m.children.length === 0)) {
         list.push({ title: m.title, path: m.path, module: m.module || 'Operations', icon: m.icon });
@@ -494,6 +501,15 @@ export const AppLayout: React.FC = () => {
             )}
           </div>
 
+          {/* User Manual & Knowledge Center */}
+          <Link
+            to="/manual"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-brand-darkCard transition-colors border border-transparent hover:border-brand-border dark:hover:border-brand-darkBorder"
+            title="Enterprise User Manual & Role Guides"
+          >
+            <BookOpen className="w-4 h-4 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400" />
+          </Link>
+
           {/* Notification Center */}
           <div className="relative" ref={notifRef}>
             <button
@@ -624,6 +640,13 @@ export const AppLayout: React.FC = () => {
                 </div>
 
                 <div className="py-1">
+                  <Link
+                    to="/manual"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-brand-darkCard text-brand-text text-xs"
+                  >
+                    <BookOpen className="w-4 h-4 mr-2 text-brand-primary dark:text-[#8495FF]" /> User Manual &amp; Guides
+                  </Link>
                   <Link
                     to="/profile"
                     onClick={() => setProfileOpen(false)}
