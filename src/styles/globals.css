@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* HotelOS Light Theme Semantic Tokens */
+    --app-bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-secondary: #F8FAFD;
+    --brand-primary: #354FC7;
+    --brand-hover: #293FA8;
+    --text-primary: #172033;
+    --text-secondary: #64748B;
+    --border-color: #E2E8F0;
+    --status-success: #16845B;
+    --status-warning: #C78B24;
+    --status-danger: #D44848;
+    --status-info: #2876C7;
+
+    /* shadcn/ui mappings */
+    --background: 220 20% 97.3%; /* #F4F6FA */
+    --foreground: 222 37% 14.5%; /* #172033 */
+    --card: 0 0% 100%;           /* #FFFFFF */
+    --card-foreground: 222 37% 14.5%;
+    --primary: 229 58% 49.4%;    /* #354FC7 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 27% 98%;    /* #F8FAFD */
+    --secondary-foreground: 222 37% 14.5%;
+    --muted: 215 28% 95%;
+    --muted-foreground: 215 16% 47%; /* #64748B */
+    --accent: 233 100% 97%;      /* Soft Lavender */
+    --accent-foreground: 229 58% 49.4%;
+    --destructive: 0 63% 56%;    /* #D44848 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91.4%;     /* #E2E8F0 */
+    --input: 214 32% 91.4%;
+    --ring: 229 58% 49.4%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    /* HotelOS Dark Theme Semantic Tokens */
+    --app-bg: #101522;
+    --surface: #171F30;
+    --surface-secondary: #1D283A;
+    --brand-primary: #8495FF;
+    --brand-hover: #9AA8FF;
+    --text-primary: #F1F5FB;
+    --text-secondary: #A0AEC0;
+    --border-color: #303B4F;
+    --status-success: #45C79A;
+    --status-warning: #E7B65A;
+    --status-danger: #F07878;
+    --status-info: #70B5F5;
+
+    /* shadcn/ui mappings */
+    --background: 223 36% 9.8%;  /* #101522 */
+    --foreground: 214 56% 96.5%; /* #F1F5FB */
+    --card: 221 35% 13.9%;       /* #171F30 */
+    --card-foreground: 214 56% 96.5%;
+    --primary: 232 100% 75.9%;   /* #8495FF */
+    --primary-foreground: 223 36% 9.8%;
+    --secondary: 219 33% 17.1%;  /* #1D283A */
+    --secondary-foreground: 214 56% 96.5%;
+    --muted: 221 35% 18%;
+    --muted-foreground: 215 20% 69%; /* #A0AEC0 */
+    --accent: 221 35% 20%;
+    --accent-foreground: 214 56% 96.5%;
+    --destructive: 0 81% 70.8%;  /* #F07878 */
+    --destructive-foreground: 223 36% 9.8%;
+    --border: 218 24.5% 24.9%;   /* #303B4F */
+    --input: 218 24.5% 24.9%;
+    --ring: 232 100% 75.9%;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
+/* Custom sleek enterprise scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Standard Action Buttons - scoped to .btn or button.btn, never polluting cards or tiles */
+.btn,
+button.btn,
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.btn svg,
+button.btn svg,
+.btn-action svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
