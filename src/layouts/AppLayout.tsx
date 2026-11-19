@@ -92,6 +92,15 @@ export const AppLayout: React.FC = () => {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Hover Flyout state for Collapsed Sidebar
+  const [hoveredMenu, setHoveredMenu] = useState<{ menu: NavigationMenuDto; top: number } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Close flyout on route navigation
+  useEffect(() => {
+    setHoveredMenu(null);
+  }, [location.pathname]);
+
   // Notifications State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
@@ -221,6 +230,35 @@ export const AppLayout: React.FC = () => {
       ...prev,
       [menuCode]: !prev[menuCode],
     }));
+  };
+
+  const handleMouseEnterItem = (e: React.MouseEvent, menu: NavigationMenuDto) => {
+    if (!isSidebarCollapsed) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const top = Math.min(rect.top, window.innerHeight - 340);
+    setHoveredMenu({ menu, top: Math.max(12, top) });
+  };
+
+  const handleMouseLeaveItem = () => {
+    if (!isSidebarCollapsed) return;
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredMenu(null);
+    }, 180);
+  };
+
+  const handleMouseEnterFlyout = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handleMouseLeaveFlyout = () => {
+    setHoveredMenu(null);
   };
 
   const renderIcon = (iconName?: string) => {
@@ -648,6 +686,8 @@ export const AppLayout: React.FC = () => {
                     <div key={menu.code} className="space-y-0.5">
                       <button
                         onClick={() => toggleExpand(menu.code)}
+                        onMouseEnter={(e) => handleMouseEnterItem(e, menu)}
+                        onMouseLeave={handleMouseLeaveItem}
                         title={isSidebarCollapsed ? menu.title : undefined}
                         className={cn(
                           'w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold transition-all group relative',
@@ -705,6 +745,8 @@ export const AppLayout: React.FC = () => {
                   <Link
                     key={menu.code}
                     to={menu.path}
+                    onMouseEnter={(e) => handleMouseEnterItem(e, menu)}
+                    onMouseLeave={handleMouseLeaveItem}
                     title={isSidebarCollapsed ? menu.title : undefined}
                     className={cn(
                       'flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all group',
@@ -735,6 +777,84 @@ export const AppLayout: React.FC = () => {
               )}
             </div>
           </aside>
+
+          {/* HOVER FLYOUT FOR COLLAPSED SIDEBAR (Submenus visible and clickable on hover) */}
+          {hoveredMenu && isSidebarCollapsed && (
+            <div
+              style={{ top: `${hoveredMenu.top}px` }}
+              onMouseEnter={handleMouseEnterFlyout}
+              onMouseLeave={handleMouseLeaveFlyout}
+              className="fixed left-16 z-50 w-60 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-2xl p-2.5 space-y-1.5 animate-in fade-in zoom-in-95 duration-150 select-none"
+            >
+              {/* Flyout Header */}
+              <div className="pb-2 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <span className="p-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-brand-primary dark:text-[#8495FF] shrink-0">
+                    {renderIcon(hoveredMenu.menu.icon)}
+                  </span>
+                  <span className="font-bold text-xs text-brand-text truncate">
+                    {hoveredMenu.menu.title}
+                  </span>
+                </div>
+                {hoveredMenu.menu.path && (
+                  <Link
+                    to={hoveredMenu.menu.path}
+                    onClick={() => setHoveredMenu(null)}
+                    className="text-[10px] text-brand-primary dark:text-[#8495FF] hover:underline font-semibold shrink-0 ml-1"
+                  >
+                    Open &rarr;
+                  </Link>
+                )}
+              </div>
+
+              {/* Submenus List */}
+              {hoveredMenu.menu.children && hoveredMenu.menu.children.length > 0 ? (
+                <div className="space-y-0.5 pt-1 max-h-72 overflow-y-auto custom-scrollbar">
+                  {hoveredMenu.menu.children.map((child) => {
+                    const isChildActive = location.pathname === child.path;
+                    return (
+                      <Link
+                        key={child.code}
+                        to={child.path}
+                        onClick={() => setHoveredMenu(null)}
+                        className={cn(
+                          'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                          isChildActive
+                            ? 'bg-brand-primary text-white font-bold shadow-soft-xs'
+                            : 'text-brand-text hover:bg-slate-100 dark:hover:bg-brand-darkCard hover:text-brand-primary dark:hover:text-white'
+                        )}
+                      >
+                        <span className="truncate">{child.title}</span>
+                        {child.badgeText && (
+                          <span
+                            className={cn(
+                              'text-[9px] px-1.5 py-0.2 rounded font-bold',
+                              isChildActive
+                                ? 'bg-white/20 text-white'
+                                : 'bg-indigo-50 text-brand-primary dark:bg-blue-500/20 dark:text-blue-300'
+                            )}
+                          >
+                            {child.badgeText}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="pt-1">
+                  <Link
+                    to={hoveredMenu.menu.path}
+                    onClick={() => setHoveredMenu(null)}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-50 dark:bg-brand-darkCard text-brand-primary hover:underline"
+                  >
+                    <span>Go to {hoveredMenu.menu.title}</span>
+                    <span>&rarr;</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* MOBILE SLIDE-OUT DRAWER */}
