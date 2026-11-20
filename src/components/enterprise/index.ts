@@ -8,3 +8,4 @@ export * from './DetailDrawer';
 export * from './LedgerSummary';
 export * from './TransactionTable';
 export * from './FinancialSummary';
+export * from './WelcomeCarousel';

@@ -27,6 +27,7 @@ import { DynamicFormViewerScreen } from '@/features/it-administration/screens/Dy
 import { DocumentNumberingScreen } from '@/features/it-administration/screens/DocumentNumberingScreen';
 import { UserManagementScreen } from '@/features/it-administration/screens/UserManagementScreen';
 import { ITSystemControlScreen } from '@/features/it-administration/screens/ITSystemControlScreen';
+import { BannerManagementScreen } from '@/features/it-administration/screens/BannerManagementScreen';
 
 // PMS Core: Front Office, Reservations & Guests
 import { RoomGridScreen } from '@/features/front-office/screens/RoomGridScreen';
@@ -186,6 +187,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="/it/workflows" element={<WorkflowManagementScreen />} />
           <Route path="/it/forms" element={<DynamicFormViewerScreen />} />
           <Route path="/it/numbering" element={<DocumentNumberingScreen />} />
+          <Route path="/it/banners" element={<BannerManagementScreen />} />
           <Route path="/it/users" element={<UserManagementScreen />} />
           <Route path="/it/roles" element={<UserManagementScreen />} />
           <Route path="/it/menus" element={<ITSystemControlScreen />} />
