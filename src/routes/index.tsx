@@ -25,6 +25,8 @@ import { MasterManagementScreen } from '@/features/it-administration/screens/Mas
 import { WorkflowManagementScreen } from '@/features/it-administration/screens/WorkflowManagementScreen';
 import { DynamicFormViewerScreen } from '@/features/it-administration/screens/DynamicFormViewerScreen';
 import { DocumentNumberingScreen } from '@/features/it-administration/screens/DocumentNumberingScreen';
+import { UserManagementScreen } from '@/features/it-administration/screens/UserManagementScreen';
+import { ITSystemControlScreen } from '@/features/it-administration/screens/ITSystemControlScreen';
 
 // PMS Core: Front Office, Reservations & Guests
 import { RoomGridScreen } from '@/features/front-office/screens/RoomGridScreen';
@@ -33,7 +35,11 @@ import { DeparturesScreen } from '@/features/front-office/screens/DeparturesScre
 import { FolioManagementScreen } from '@/features/front-office/screens/FolioManagementScreen';
 import { ReservationListScreen } from '@/features/reservations/screens/ReservationListScreen';
 import { NewReservationScreen } from '@/features/reservations/screens/NewReservationScreen';
+import { AvailabilityMatrixScreen } from '@/features/reservations/screens/AvailabilityMatrixScreen';
 import { GuestDirectoryScreen } from '@/features/guests/screens/GuestDirectoryScreen';
+
+// Common Screens
+import { NotFoundScreen } from '@/features/dashboard/screens/NotFoundScreen';
 
 // Phase 5: Operational Departments
 import { RoomStatusBoardScreen } from '@/features/housekeeping/screens/RoomStatusBoardScreen';
@@ -102,6 +108,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="/reservations" element={<Navigate to="/reservations/list" replace />} />
           <Route path="/reservations/list" element={<ReservationListScreen />} />
           <Route path="/reservations/new" element={<NewReservationScreen />} />
+          <Route path="/reservations/matrix" element={<AvailabilityMatrixScreen />} />
 
           {/* Guests Directory Routes */}
           <Route path="/guests" element={<Navigate to="/guests/list" replace />} />
@@ -179,11 +186,20 @@ export const AppRoutes: React.FC = () => {
           <Route path="/it/workflows" element={<WorkflowManagementScreen />} />
           <Route path="/it/forms" element={<DynamicFormViewerScreen />} />
           <Route path="/it/numbering" element={<DocumentNumberingScreen />} />
+          <Route path="/it/users" element={<UserManagementScreen />} />
+          <Route path="/it/roles" element={<UserManagementScreen />} />
+          <Route path="/it/menus" element={<ITSystemControlScreen />} />
+          <Route path="/it/security" element={<ITSystemControlScreen />} />
+          <Route path="/it/audit" element={<ITSystemControlScreen />} />
+          <Route path="/it/health" element={<ITSystemControlScreen />} />
 
           {/* User Manual & Knowledge Center */}
           <Route path="/manual" element={<UserManualScreen />} />
           <Route path="/docs" element={<Navigate to="/manual" replace />} />
           <Route path="/help" element={<Navigate to="/manual" replace />} />
+
+          {/* 404 Catch-all for authenticated session */}
+          <Route path="*" element={<NotFoundScreen />} />
         </Route>
       </Route>
 
