@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { api } from '@/services/api';
 import { MasterDefinitionDto, MasterValueDto, CreateMasterValueRequest } from '@/types/masters';
@@ -7,19 +7,17 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { DynamicDropdown } from '@/components/dynamic-dropdown/DynamicDropdown';
 import { Button } from '@/components/common/Button';
 import { Card, Badge, Alert } from '@/components/common/Card';
-import { Input, Textarea, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import { FormDrawer, FormSection, RowActions, StatusBadge } from '@/components/enterprise';
 import {
   Database,
   Plus,
-  CheckCircle,
-  XCircle,
   Sliders,
   Sparkles,
-  X,
-  Layers,
   ArrowRight,
+  Layers,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 export const MasterManagementScreen: React.FC = () => {
@@ -37,8 +35,8 @@ export const MasterManagementScreen: React.FC = () => {
   // Interactive Live Dropdown Test
   const [testDropdownValue, setTestDropdownValue] = useState<string>('');
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [modalForm, setModalForm] = useState<{
     code: string;
     name: string;
@@ -53,7 +51,7 @@ export const MasterManagementScreen: React.FC = () => {
     displayOrder: 1,
     isDefault: false,
   });
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch Definitions
@@ -99,10 +97,10 @@ export const MasterManagementScreen: React.FC = () => {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDefinition) return;
-    setModalError(null);
+    setDrawerError(null);
 
     if (!modalForm.code.trim() || !modalForm.name.trim()) {
-      setModalError('Code and Name are required.');
+      setDrawerError('Code and Name are required.');
       return;
     }
 
@@ -124,7 +122,7 @@ export const MasterManagementScreen: React.FC = () => {
       });
 
       if (res.success) {
-        setIsModalOpen(false);
+        setIsDrawerOpen(false);
         setModalForm({
           code: '',
           name: '',
@@ -134,7 +132,7 @@ export const MasterManagementScreen: React.FC = () => {
         });
         fetchValues();
       } else {
-        setModalError(res.message || 'Failed to create master value.');
+        setDrawerError(res.message || 'Failed to create master value.');
       }
     } finally {
       setIsSaving(false);
@@ -161,73 +159,68 @@ export const MasterManagementScreen: React.FC = () => {
   };
 
   // Columns
-  const columns: ColumnDef<MasterValueDto>[] = [
-    {
-      accessorKey: 'code',
-      header: 'Value Code',
-      cell: ({ row }) => (
-        <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-          {row.original.code}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'name',
-      header: 'Display Label',
-      cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-slate-900 dark:text-white text-xs">{row.original.name}</div>
-          {row.original.description && (
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">{row.original.description}</div>
-          )}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'displayOrder',
-      header: 'Sort Order',
-      cell: ({ row }) => (
-        <span className="text-slate-500 font-mono text-xs">{row.original.displayOrder}</span>
-      ),
-    },
-    {
-      accessorKey: 'isDefault',
-      header: 'Default Flag',
-      cell: ({ row }) =>
-        row.original.isDefault ? (
-          <Badge variant="brand" size="sm">Default</Badge>
-        ) : (
-          <span className="text-slate-400 text-xs">&mdash;</span>
+  const columns = useMemo<ColumnDef<MasterValueDto>[]>(
+    () => [
+      {
+        accessorKey: 'code',
+        header: 'Value Code',
+        cell: ({ row }) => (
+          <span className="font-mono font-bold text-xs text-[#354FC7] dark:text-[#8495FF]">
+            {row.original.code}
+          </span>
         ),
-    },
-    {
-      accessorKey: 'isActive',
-      header: 'Status',
-      cell: ({ row }) =>
-        row.original.isActive ? (
-          <Badge variant="success" dot size="sm">Active</Badge>
-        ) : (
-          <Badge variant="neutral" size="sm">Disabled</Badge>
+      },
+      {
+        accessorKey: 'name',
+        header: 'Display Label',
+        cell: ({ row }) => (
+          <div>
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">{row.original.name}</div>
+            {row.original.description && (
+              <div className="text-[11px] text-brand-muted truncate max-w-xs">{row.original.description}</div>
+            )}
+          </div>
         ),
-    },
-    {
-      id: 'actions',
-      header: 'Toggle',
-      cell: ({ row }) => (
-        <button
-          onClick={() => handleToggleActive(row.original)}
-          className={`p-1.5 rounded-lg border text-xs font-semibold transition ${
-            row.original.isActive
-              ? 'border-border dark:border-navy-700 text-slate-600 dark:text-slate-400 hover:text-danger'
-              : 'border-emerald-200 dark:border-emerald-800 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-          }`}
-          title={row.original.isActive ? 'Deactivate' : 'Activate'}
-        >
-          {row.original.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-        </button>
-      ),
-    },
-  ];
+      },
+      {
+        accessorKey: 'displayOrder',
+        header: 'Sort Order',
+        cell: ({ row }) => (
+          <span className="text-slate-500 font-mono text-xs">{row.original.displayOrder}</span>
+        ),
+      },
+      {
+        accessorKey: 'isDefault',
+        header: 'Default Flag',
+        cell: ({ row }) =>
+          row.original.isDefault ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-[#354FC7] dark:bg-brand-darkSecondary dark:text-[#8495FF] border border-indigo-100 dark:border-brand-darkBorder">
+              Default
+            </span>
+          ) : (
+            <span className="text-slate-400 text-xs">&mdash;</span>
+          ),
+      },
+      {
+        accessorKey: 'isActive',
+        header: 'Status',
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.isActive ? 'ACTIVE' : 'INACTIVE'} />
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            isActive={row.original.isActive}
+            onToggleStatus={() => handleToggleActive(row.original)}
+          />
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <PageContainer>
@@ -235,16 +228,17 @@ export const MasterManagementScreen: React.FC = () => {
       <PageHeader
         breadcrumb={[
           { label: 'Administration', href: '/it' },
-          { label: 'Master Options' },
+          { label: 'Master Registries' },
         ]}
         title="Master Data Configuration & Option Sets"
         subtitle="Centralized database choices, zero hardcoding policy & real-time dynamic dropdown binding"
+        icon={<Database className="w-4 h-4" />}
         actions={
           <PageActions>
             <Button
               size="sm"
               onClick={() => {
-                setModalError(null);
+                setDrawerError(null);
                 setModalForm({
                   code: '',
                   name: '',
@@ -252,7 +246,7 @@ export const MasterManagementScreen: React.FC = () => {
                   displayOrder: values.length + 1,
                   isDefault: false,
                 });
-                setIsModalOpen(true);
+                setIsDrawerOpen(true);
               }}
               disabled={!selectedDefinition}
               icon={<Plus className="w-3.5 h-3.5" />}
@@ -267,10 +261,12 @@ export const MasterManagementScreen: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Left Sidebar: Master Categories */}
         <div className="space-y-4">
-          <Card className="p-4 space-y-2">
-            <div className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2 flex items-center justify-between">
+          <Card className="p-3.5 space-y-2 border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-soft-xs">
+            <div className="text-xs font-bold text-brand-text uppercase tracking-wider mb-2 flex items-center justify-between">
               <span>Master Registries</span>
-              <Badge variant="neutral" size="sm">{definitions.length}</Badge>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-brand-darkCard text-slate-600 dark:text-slate-400">
+                {definitions.length}
+              </span>
             </div>
 
             <div className="space-y-1">
@@ -283,10 +279,10 @@ export const MasterManagementScreen: React.FC = () => {
                       setSelectedDefinition(def);
                       setPageIndex(0);
                     }}
-                    className={`w-full text-left p-2.5 rounded-xl text-xs font-semibold transition flex items-center justify-between ${
+                    className={`w-full text-left p-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-between ${
                       isSelected
-                        ? 'bg-brand-indigo text-white shadow-soft-xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800'
+                        ? 'bg-brand-primary text-white shadow-soft-xs'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-brand-darkCard'
                     }`}
                   >
                     <div>
@@ -304,16 +300,16 @@ export const MasterManagementScreen: React.FC = () => {
 
           {/* Live Interactive Dropdown Preview */}
           {selectedDefinition && (
-            <Card className="p-4 space-y-3 bg-gradient-to-br from-slate-50 to-indigo-50/40 dark:from-navy-900 dark:to-navy-800/80 border-border dark:border-navy-700">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
-                <Sparkles className="w-4 h-4 text-brand-indigo" />
+            <Card className="p-4 space-y-3 bg-slate-50/60 dark:bg-brand-darkCard border border-brand-border dark:border-brand-darkBorder shadow-soft-xs">
+              <div className="flex items-center gap-2 text-xs font-bold text-brand-text">
+                <Sparkles className="w-4 h-4 text-brand-primary dark:text-[#8495FF]" />
                 <span>Live Component Test</span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-brand-muted leading-relaxed">
                 Rendered with <code>DynamicDropdown</code>. Any added or updated options appear instantly.
               </p>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-semibold text-brand-text mb-1">
                   {selectedDefinition.name} Selector:
                 </label>
                 <DynamicDropdown
@@ -324,7 +320,7 @@ export const MasterManagementScreen: React.FC = () => {
                 />
               </div>
               {testDropdownValue && (
-                <div className="text-[11px] font-mono text-slate-600 dark:text-slate-300 bg-white dark:bg-navy-900 p-2 rounded-lg border border-border dark:border-navy-700">
+                <div className="text-[11px] font-mono text-slate-600 dark:text-slate-300 bg-white dark:bg-brand-darkSurface p-2 rounded-lg border border-brand-border dark:border-brand-darkBorder">
                   Selected Code: <strong>{testDropdownValue}</strong>
                 </div>
               )}
@@ -333,7 +329,7 @@ export const MasterManagementScreen: React.FC = () => {
         </div>
 
         {/* Right Content: DataTable */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-3 space-y-4">
           <DataTable<MasterValueDto>
             title={`${selectedDefinition?.name || 'Master'} Values Manifest`}
             subtitle={selectedDefinition?.description || 'Zero-hardcoding central database values'}
@@ -356,94 +352,95 @@ export const MasterManagementScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Master Value Modal */}
+      {/* Slide-over FormDrawer for Adding Option */}
       {selectedDefinition && (
-        <Modal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+        <FormDrawer
+          isOpen={isDrawerOpen}
+          onClose={() => setIsDrawerOpen(false)}
+          onSubmit={handleCreateSubmit}
           title={`Add Option to ${selectedDefinition.name}`}
           subtitle={`Master Code: ${selectedDefinition.code}`}
-          icon={<Plus className="w-4 h-4" />}
-          size="lg"
-          onSubmit={handleCreateSubmit}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsModalOpen(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isSaving || !modalForm.code.trim() || !modalForm.name.trim()}
-                isLoading={isSaving}
-                leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
-              >
-                Add Master Option
-              </Button>
-            </>
-          }
+          submitText={isSaving ? 'Saving Option...' : 'Save Master Option'}
+          isLoading={isSaving}
+          width="md"
         >
-          {modalError && (
-            <Alert type="error" message={modalError} />
+          {drawerError && (
+            <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{drawerError}</span>
+            </div>
           )}
 
-          <FormGrid cols={2}>
-            <Input
-              label="System Code *"
-              required
-              value={modalForm.code}
-              onChange={(e) => setModalForm({ ...modalForm, code: e.target.value })}
-              placeholder="e.g. VIP_SUITE"
-              className="font-mono uppercase"
-            />
-            <Input
-              label="Display Label *"
-              required
-              value={modalForm.name}
-              onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-              placeholder="e.g. Presidential VIP Suite"
-            />
-          </FormGrid>
+          <FormSection title="Option Identification" description="Code and display text for dynamic form bindings">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                System Code *
+              </label>
+              <input
+                type="text"
+                required
+                value={modalForm.code}
+                onChange={(e) => setModalForm({ ...modalForm, code: e.target.value })}
+                placeholder="e.g. VIP_SUITE"
+                className="w-full h-8 px-2.5 text-xs font-mono uppercase rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
 
-          <div>
-            <Textarea
-              label="Description / Help Notes"
-              rows={2}
-              value={modalForm.description}
-              onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
-              placeholder="Describe when this master choice should be selected..."
-            />
-          </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Display Label *
+              </label>
+              <input
+                type="text"
+                required
+                value={modalForm.name}
+                onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                placeholder="e.g. Presidential VIP Suite"
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
 
-          <FormGrid cols={2}>
-            <Input
-              label="Sort Display Order"
-              type="number"
-              min="1"
-              value={modalForm.displayOrder}
-              onChange={(e) => setModalForm({ ...modalForm, displayOrder: Number(e.target.value) })}
-              className="font-mono"
-            />
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Description / Help Notes
+              </label>
+              <textarea
+                rows={2}
+                value={modalForm.description}
+                onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                placeholder="Describe when this master choice should be selected..."
+                className="w-full p-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none resize-none"
+              />
+            </div>
+          </FormSection>
 
-            <div className="flex items-center pt-6">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <FormSection title="Ordering & Defaults" description="Sorting behavior in dynamic selects">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Sort Display Order
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={modalForm.displayOrder}
+                onChange={(e) => setModalForm({ ...modalForm, displayOrder: Number(e.target.value) })}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center pt-5">
+              <label className="flex items-center space-x-2 cursor-pointer select-none text-xs font-semibold text-brand-text">
                 <input
                   type="checkbox"
                   checked={modalForm.isDefault}
                   onChange={(e) => setModalForm({ ...modalForm, isDefault: e.target.checked })}
-                  className="rounded border-slate-300 text-brand-indigo focus:ring-brand-indigo"
+                  className="rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
                 />
-                <span>Set as System Default Option</span>
+                <span>Set as Default Option</span>
               </label>
             </div>
-          </FormGrid>
-        </Modal>
+          </FormSection>
+        </FormDrawer>
       )}
     </PageContainer>
   );

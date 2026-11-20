@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import { HousekeepingTaskDto } from '@/types/operations';
 import { RoomDto } from '@/types/pms';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
-import { Select, Textarea, FormGrid } from '@/components/common/Input';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
 import {
   Sparkles,
   Plus,
@@ -17,9 +23,10 @@ import {
   CheckCircle2,
   ShieldCheck,
   UserCheck,
-  X,
   Clock,
-  Layers,
+  DoorOpen,
+  AlertCircle,
+  Download,
 } from 'lucide-react';
 
 export const HousekeepingTasksScreen: React.FC = () => {
@@ -29,41 +36,47 @@ export const HousekeepingTasksScreen: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [taskTypeFilter, setTaskTypeFilter] = useState<string>('');
-  const [priorityFilter, setPriorityFilter] = useState<string>('');
+  // Filters & Tabs
+  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>('ALL');
 
-  // Modals
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [selectedTask, setSelectedTask] = useState<HousekeepingTaskDto | null>(null);
   const [createSubmitting, setCreateSubmitting] = useState<boolean>(false);
   const [availableRooms, setAvailableRooms] = useState<RoomDto[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | ''>('');
   const [taskType, setTaskType] = useState<string>('DAILY_CLEAN');
   const [priority, setPriority] = useState<string>('MEDIUM');
   const [remarks, setRemarks] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (statusFilter) query.append('status', statusFilter);
-    if (taskTypeFilter) query.append('taskType', taskTypeFilter);
-    if (priorityFilter) query.append('priority', priorityFilter);
+    if (search.trim()) query.append('search', search.trim());
+    if (activeTab !== 'ALL') query.append('status', activeTab);
+    if (priorityFilter !== 'ALL') query.append('priority', priorityFilter);
+    if (taskTypeFilter !== 'ALL') query.append('taskType', taskTypeFilter);
 
-    const res = await api.get<PagedResult<HousekeepingTaskDto>>(`/housekeeping/tasks?${query.toString()}`);
+    const res = await api.get<PagedResult<HousekeepingTaskDto>>(
+      `/housekeeping/tasks?${query.toString()}`
+    );
     if (res.success && res.data) {
       setTasks(res.data.items);
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, activeTab, priorityFilter, taskTypeFilter]);
 
   useEffect(() => {
     fetchTasks();
-  }, [pageIndex, pageSize, statusFilter, taskTypeFilter, priorityFilter]);
+  }, [fetchTasks]);
 
   const loadRooms = async () => {
     const res = await api.get<PagedResult<RoomDto>>('/pms/rooms?pageSize=100');
@@ -75,25 +88,31 @@ export const HousekeepingTasksScreen: React.FC = () => {
     }
   };
 
+  const handleOpenCreateDrawer = () => {
+    loadRooms();
+    setShowCreateDrawer(true);
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoomId) return;
 
     setCreateSubmitting(true);
+    setErrorMsg(null);
     const res = await api.post('/housekeeping/tasks', {
       roomId: Number(selectedRoomId),
       taskType,
       priority,
       remarks,
     });
-    setCreateSubmitting(false);
-
     if (res.success) {
-      setShowCreateModal(false);
-      setSelectedRoomId('');
+      setShowCreateDrawer(false);
       setRemarks('');
-      await fetchTasks();
+      fetchTasks();
+    } else {
+      setErrorMsg(res.message || 'Failed to create task.');
     }
+    setCreateSubmitting(false);
   };
 
   const handleUpdateStatus = async (taskId: number, newStatus: string) => {
@@ -101,137 +120,103 @@ export const HousekeepingTasksScreen: React.FC = () => {
       status: newStatus,
     });
     if (res.success) {
-      await fetchTasks();
+      fetchTasks();
     }
   };
 
-  const pendingCount = tasks.filter(t => t.status === 'PENDING').length;
-  const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-  const inspectedCount = tasks.filter(t => t.status === 'INSPECTED').length;
-
-  const columns = useMemo<ColumnDef<HousekeepingTaskDto>[]>(
+  const columns: ColumnDef<HousekeepingTaskDto>[] = useMemo(
     () => [
-      {
-        accessorKey: 'taskNumber',
-        header: 'Task #',
-        cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-            {info.getValue() as string}
-          </span>
-        ),
-      },
       {
         accessorKey: 'roomNumber',
         header: 'Room',
-        cell: (info) => {
-          const row = info.row.original;
-          return (
-            <div>
-              <span className="font-bold text-slate-900 dark:text-white">Room {row.roomNumber}</span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 font-mono">
-                (Floor {row.floorNumber} &bull; {row.roomTypeCode})
-              </span>
-            </div>
-          );
-        },
+        cell: (info) => (
+          <div className="flex items-center space-x-1.5 font-mono">
+            <DoorOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="font-bold text-xs text-brand-primary dark:text-[#8495FF]">
+              #{info.getValue() as string}
+            </span>
+          </div>
+        ),
       },
       {
         accessorKey: 'taskType',
-        header: 'Task Scope',
-        cell: (info) => {
-          const type = (info.getValue() as string) || '';
-          return (
-            <Badge variant="neutral" size="sm">
-              {type.replace('_', ' ')}
-            </Badge>
-          );
-        },
+        header: 'Task Type',
+        cell: (info) => (
+          <span className="font-semibold text-xs text-brand-text">
+            {(info.getValue() as string).replace(/_/g, ' ')}
+          </span>
+        ),
       },
       {
         accessorKey: 'priority',
         header: 'Priority',
         cell: (info) => {
           const p = (info.getValue() as string) || '';
-          if (p === 'HIGH' || p === 'URGENT') return <Badge variant="danger" size="sm" dot>{p}</Badge>;
-          if (p === 'MEDIUM') return <Badge variant="warning" size="sm">{p}</Badge>;
-          return <Badge variant="neutral" size="sm">{p}</Badge>;
+          const variant = p === 'URGENT' || p === 'HIGH' ? 'danger' : p === 'MEDIUM' ? 'warning' : 'neutral';
+          return <StatusBadge status={p} variant={variant} />;
+        },
+      },
+      {
+        accessorKey: 'assignedToStaffName',
+        header: 'Assigned Attendant',
+        cell: (info) => {
+          const val = info.getValue() as string;
+          return val ? (
+            <div className="flex items-center space-x-1 text-xs font-medium text-brand-text">
+              <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>{val}</span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-brand-muted italic">Unassigned</span>
+          );
         },
       },
       {
         accessorKey: 'status',
-        header: 'Progress',
-        cell: (info) => {
-          const s = (info.getValue() as string) || '';
-          if (s === 'PENDING') return <Badge variant="warning" dot>Pending</Badge>;
-          if (s === 'IN_PROGRESS') return <Badge variant="brand" dot>Cleaning Active</Badge>;
-          if (s === 'COMPLETED') return <Badge variant="success">Completed</Badge>;
-          if (s === 'INSPECTED') return <Badge variant="brand">Inspected &amp; OK</Badge>;
-          return <Badge variant="neutral">{s}</Badge>;
-        },
-      },
-      {
-        accessorKey: 'assignedToUserName',
-        header: 'Attendant',
-        cell: (info) => {
-          const val = info.getValue() as string | undefined;
-          return val ? (
-            <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{val}</span>
-            </div>
-          ) : (
-            <span className="text-xs text-slate-400 italic">Unassigned</span>
-          );
-        },
+        header: 'Status',
+        cell: (info) => <StatusBadge status={info.getValue() as string} />,
       },
       {
         id: 'actions',
-        header: 'Workflow Action',
-        cell: (info) => {
-          const task = info.row.original;
-          return (
-            <div className="flex items-center gap-1.5">
-              {task.status === 'PENDING' && (
-                <Button
-                  size="xs"
-                  onClick={() => handleUpdateStatus(task.id, 'IN_PROGRESS')}
-                  className="font-semibold text-xs flex items-center gap-1"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>Start</span>
-                </Button>
-              )}
-              {task.status === 'IN_PROGRESS' && (
-                <Button
-                  size="xs"
-                  variant="success"
-                  onClick={() => handleUpdateStatus(task.id, 'COMPLETED')}
-                  className="font-semibold text-xs flex items-center gap-1"
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Done</span>
-                </Button>
-              )}
-              {task.status === 'COMPLETED' && (
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  onClick={() => handleUpdateStatus(task.id, 'INSPECTED')}
-                  className="font-semibold text-xs flex items-center gap-1"
-                >
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Inspect</span>
-                </Button>
-              )}
-              {task.status === 'INSPECTED' && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Turnover Complete</span>
-                </span>
-              )}
-            </div>
-          );
-        },
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center space-x-2">
+            {row.original.status === 'PENDING' && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => handleUpdateStatus(row.original.id, 'IN_PROGRESS')}
+                className="text-[11px] h-7"
+                leftIcon={<Play className="w-3 h-3 text-[#2876C7]" />}
+              >
+                Start
+              </Button>
+            )}
+
+            {row.original.status === 'IN_PROGRESS' && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => handleUpdateStatus(row.original.id, 'INSPECTED')}
+                className="text-[11px] h-7 text-[#16845B]"
+                leftIcon={<CheckCircle2 className="w-3 h-3" />}
+              >
+                Finish
+              </Button>
+            )}
+
+            <RowActions
+              onView={() => setSelectedTask(row.original)}
+              customActions={[
+                {
+                  label: 'Mark Clean & Inspected',
+                  icon: <ShieldCheck className="w-3.5 h-3.5 text-[#16845B]" />,
+                  onClick: () => handleUpdateStatus(row.original.id, 'COMPLETED'),
+                },
+              ]}
+            />
+          </div>
+        ),
       },
     ],
     []
@@ -239,250 +224,217 @@ export const HousekeepingTasksScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Housekeeping', href: '/housekeeping/status' },
-          { label: 'Tasks & Turnover' },
-        ]}
-        title="Housekeeping Tasks &amp; Turnover"
-        subtitle="Turnover assignments, deep cleans, supervisor QA inspections, and priority gating"
-        icon={<Sparkles className="w-4 h-4" />}
-        badge={<Badge variant="teal">Operations</Badge>}
+        title="Housekeeping Tasks & Cleaning"
+        badge={<StatusBadge status="ACTIVE" label="Operations Active" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => {
-                loadRooms();
-                setShowCreateModal(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Dispatch Cleaning Task
+              Export Tasks
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenCreateDrawer}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              New Cleaning Task
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Shift Tasks
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount}
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: 'All Tasks', count: totalCount },
+          { id: 'PENDING', label: 'Pending Assignment' },
+          { id: 'IN_PROGRESS', label: 'In Progress' },
+          { id: 'INSPECTED', label: 'Inspected' },
+          { id: 'COMPLETED', label: 'Completed' },
+        ]}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Pending Turnover
-            </div>
-            <div className="text-xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">
-              {pendingCount}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search room #, attendant name..."
+        filters={[
+          {
+            id: 'priority',
+            label: 'Priority',
+            value: priorityFilter,
+            options: [
+              { label: 'All Priorities', value: 'ALL' },
+              { label: 'Urgent', value: 'URGENT' },
+              { label: 'High', value: 'HIGH' },
+              { label: 'Medium', value: 'MEDIUM' },
+              { label: 'Low', value: 'LOW' },
+            ],
+            onChange: setPriorityFilter,
+          },
+          {
+            id: 'taskType',
+            label: 'Cleaning Type',
+            value: taskTypeFilter,
+            options: [
+              { label: 'All Types', value: 'ALL' },
+              { label: 'Daily Service', value: 'DAILY_CLEAN' },
+              { label: 'Checkout Turn', value: 'CHECKOUT_CLEAN' },
+              { label: 'Deep Sanitize', value: 'DEEP_CLEAN' },
+              { label: 'Evening Turndown', value: 'TURNDOWN' },
+            ],
+            onChange: setTaskTypeFilter,
+          },
+        ]}
+        onResetFilters={() => {
+          setSearch('');
+          setPriorityFilter('ALL');
+          setTaskTypeFilter('ALL');
+        }}
+        isFiltered={search !== '' || priorityFilter !== 'ALL' || taskTypeFilter !== 'ALL'}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-900/50">
-            <Play className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Currently Cleaning
-            </div>
-            <div className="text-xl font-bold text-sky-600 dark:text-sky-400 tracking-tight">
-              {inProgressCount}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Inspected &amp; Released
-            </div>
-            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {inspectedCount}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Progress Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed (Needs QA)</option>
-            <option value="INSPECTED">Inspected &amp; Approved</option>
-          </Select>
-        </div>
-        <div className="w-full sm:w-56">
-          <Select
-            value={taskTypeFilter}
-            onChange={(e) => {
-              setTaskTypeFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Task Types</option>
-            <option value="DAILY_CLEAN">Daily Clean</option>
-            <option value="CHECKOUT_TURNOVER">Checkout Turnover</option>
-            <option value="DEEP_CLEAN">Deep Clean</option>
-            <option value="TURNDOWN">Evening Turndown</option>
-          </Select>
-        </div>
-
-        <div className="w-full sm:w-56">
-          <Select
-            value={priorityFilter}
-            onChange={(e) => {
-              setPriorityFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="NORMAL">Normal</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Tasks DataTable */}
-      <DataTable<HousekeepingTaskDto>
-        title="Housekeeping Task Schedule"
-        subtitle="Operational room turnover manifest synced with front desk departures"
+      {/* 4. Data Table */}
+      <DataTable
         data={tasks}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onRefresh={fetchTasks}
-        exportFileName="housekeeping_tasks.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* Create Task Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Create Housekeeping Work Order"
-        subtitle="Assign room cleaning or deep sanitization to housekeeping team"
-        icon={<Sparkles className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Create Task Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCreateTask}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowCreateModal(false)}
-              disabled={createSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={createSubmitting || !selectedRoomId}
-              isLoading={createSubmitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Dispatch Task
-            </Button>
-          </>
-        }
+        title="Dispatch Cleaning Task"
+        subtitle="Assign housekeeping task to room inventory"
+        submitText={createSubmitting ? 'Dispatching...' : 'Dispatch Task'}
+        isLoading={createSubmitting}
+        width="md"
       >
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-            Select Room *
-          </label>
-          <Select
-            value={selectedRoomId}
-            onChange={(e) => setSelectedRoomId(Number(e.target.value))}
-            required
-          >
-            <option value="">Choose room...</option>
-            {availableRooms.map((r) => (
-              <option key={r.id} value={r.id}>
-                Room {r.roomNumber} &mdash; Floor {r.floorNumber} ({r.roomTypeCode} &bull; Status: {r.roomStatusCode})
-              </option>
-            ))}
-          </Select>
-        </div>
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        <FormGrid cols={2}>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Cleaning Task Type
+        <FormSection title="Task Parameters" description="Select target room and cleaning protocol">
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Select Room *
             </label>
-            <Select
+            <select
+              value={selectedRoomId}
+              onChange={(e) => setSelectedRoomId(Number(e.target.value))}
+              required
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            >
+              {availableRooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  Room #{r.roomNumber} - Floor {r.floorNumber} ({r.roomTypeCode}) - Current Status: {r.roomStatusCode}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Task Type *
+            </label>
+            <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
-              <option value="DAILY_CLEAN">Daily In-Stay Clean</option>
-              <option value="CHECKOUT_TURNOVER">Checkout Turnover (Full Reset)</option>
-              <option value="DEEP_CLEAN">Deep Sanitization &amp; Carpet</option>
-              <option value="TURNDOWN">Evening Turndown Service</option>
-            </Select>
+              <option value="DAILY_CLEAN">Daily Service Clean</option>
+              <option value="CHECKOUT_CLEAN">Checkout Turnover</option>
+              <option value="DEEP_CLEAN">Deep Sanitation</option>
+              <option value="TURNDOWN">Evening Turndown</option>
+            </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Priority
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Priority *
             </label>
-            <Select
+            <select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
+              <option value="URGENT">Urgent (VIP Arriving)</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium (Normal)</option>
               <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High (Next Arrival Expected)</option>
-              <option value="URGENT">Urgent (VIP Arrival)</option>
-            </Select>
+            </select>
           </div>
-        </FormGrid>
 
-        <div>
-          <Textarea
-            label="Special Housekeeping Directives / Instructions"
-            rows={3}
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            placeholder="e.g. VIP arrival at 2:00 PM; extra down pillows and orchid arrangement on dresser."
-          />
-        </div>
-      </Modal>
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Instructions &amp; Special Remarks
+            </label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Extra towels requested, change linen sets, restock minibar"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              className="w-full p-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+      </FormDrawer>
+
+      {/* 6. Detail Drawer */}
+      {selectedTask && (
+        <DetailDrawer
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          title={`Task: Room #${selectedTask.roomNumber}`}
+          subtitle={`Cleaning Type: ${selectedTask.taskType.replace(/_/g, ' ')}`}
+          status={selectedTask.status}
+          width="md"
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Priority</span>
+                <StatusBadge status={selectedTask.priority} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Attendant</span>
+                <span className="font-semibold text-brand-text">{selectedTask.assignedToUserName || 'Unassigned'}</span>
+              </div>
+            </div>
+
+            {selectedTask.remarks && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-1">Special Instructions</span>
+                <p className="text-brand-text">{selectedTask.remarks}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

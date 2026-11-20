@@ -1,45 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { DiningTableDto } from '@/types/operations';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Select } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
+  PageTabs,
+  ListToolbar,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+} from '@/components/enterprise';
+import {
   UtensilsCrossed,
-  RefreshCw,
   Users,
   CheckCircle2,
   Clock,
   Sparkles,
-  X,
-  Layers,
   Receipt,
+  Layers,
+  ArrowRight,
+  Download,
 } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 export const TableManagementScreen: React.FC = () => {
   const [tables, setTables] = useState<DiningTableDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedSection, setSelectedSection] = useState<string>('ALL');
+  const [statusTab, setStatusTab] = useState<string>('ALL');
+  const [sectionFilter, setSectionFilter] = useState<string>('ALL');
 
-  // Status Change Modal
+  // Status Change Drawer
   const [activeTable, setActiveTable] = useState<DiningTableDto | null>(null);
   const [newStatus, setNewStatus] = useState<string>('AVAILABLE');
   const [updating, setUpdating] = useState<boolean>(false);
 
-  const fetchTables = async () => {
+  const fetchTables = useCallback(async () => {
     setLoading(true);
     const res = await api.get<DiningTableDto[]>('/restaurant/tables');
     if (res.success && res.data) {
       setTables(res.data);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchTables();
-  }, []);
+  }, [fetchTables]);
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,225 +64,171 @@ export const TableManagementScreen: React.FC = () => {
     }
   };
 
-  const sections = ['ALL', 'MAIN_DINING', 'TERRACE', 'ROOFTOP', 'BAR', 'PRIVATE_DINING'];
+  const filteredTables = useMemo(() => {
+    return tables.filter((t) => {
+      const matchSection = sectionFilter === 'ALL' || t.section === sectionFilter;
+      const matchStatus = statusTab === 'ALL' || t.status === statusTab;
+      return matchSection && matchStatus;
+    });
+  }, [tables, sectionFilter, statusTab]);
 
-  const filteredTables = tables.filter((t) =>
-    selectedSection === 'ALL' ? true : t.section === selectedSection
-  );
-
-  const getTableStatusBadge = (status: string) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return { label: 'Available', variant: 'success' as const, icon: CheckCircle2 };
-      case 'OCCUPIED':
-        return { label: 'Occupied', variant: 'danger' as const, icon: Users };
-      case 'RESERVED':
-        return { label: 'Reserved', variant: 'warning' as const, icon: Clock };
-      case 'BILLED':
-        return { label: 'Check Printed', variant: 'brand' as const, icon: Receipt };
-      default:
-        return { label: status, variant: 'neutral' as const, icon: Sparkles };
-    }
-  };
-
-  const availableCount = tables.filter(t => t.status === 'AVAILABLE').length;
-  const occupiedCount = tables.filter(t => t.status === 'OCCUPIED').length;
-  const reservedCount = tables.filter(t => t.status === 'RESERVED').length;
+  const countAvailable = useMemo(() => tables.filter((t) => t.status === 'AVAILABLE').length, [tables]);
+  const countOccupied = useMemo(() => tables.filter((t) => t.status === 'OCCUPIED').length, [tables]);
+  const countReserved = useMemo(() => tables.filter((t) => t.status === 'RESERVED').length, [tables]);
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'F&B', href: '/restaurant/pos' },
-          { label: 'Floor Plan' },
-        ]}
-        title="Restaurant Floor Plan & Tables"
-        subtitle="Live seating capacity, occupancy turnover, and reservation holds"
+        title="Restaurant Table Management"
+        badge={<StatusBadge status="ACTIVE" label="Live Dining Floor" />}
         actions={
           <PageActions>
-            <Button
-              onClick={fetchTables}
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
-            >
-              Refresh
-            </Button>
+            <Link to="/restaurant/pos">
+              <Button
+                variant="primary"
+                size="sm"
+                className="text-xs"
+                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+              >
+                Open POS Terminal
+              </Button>
+            </Link>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <Layers className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Tables
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {tables.length}
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={statusTab}
+        onChange={setStatusTab}
+        tabs={[
+          { id: 'ALL', label: 'All Tables', count: tables.length },
+          { id: 'AVAILABLE', label: 'Available Ready', count: countAvailable },
+          { id: 'OCCUPIED', label: 'Dining (Occupied)', count: countOccupied },
+          { id: 'RESERVED', label: 'Reserved', count: countReserved },
+          { id: 'BILLED', label: 'Check Printed' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Available
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {availableCount}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        filters={[
+          {
+            id: 'section',
+            label: 'Dining Section',
+            value: sectionFilter,
+            options: [
+              { label: 'All Dining Zones', value: 'ALL' },
+              { label: 'Main Dining Room', value: 'MAIN_DINING' },
+              { label: 'Outdoor Terrace', value: 'TERRACE' },
+              { label: 'Rooftop Lounge', value: 'ROOFTOP' },
+              { label: 'Cocktail Bar', value: 'BAR' },
+              { label: 'Private Dining Suites', value: 'PRIVATE_DINING' },
+            ],
+            onChange: setSectionFilter,
+            width: 'w-48',
+          },
+        ]}
+        onResetFilters={() => setSectionFilter('ALL')}
+        isFiltered={sectionFilter !== 'ALL'}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-100 dark:border-rose-900/50 shrink-0">
-            <Users className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Occupied
-            </div>
-            <div className="text-lg font-bold text-rose-600 dark:text-rose-400 tracking-tight">
-              {occupiedCount}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50 shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Reserved
-            </div>
-            <div className="text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tight">
-              {reservedCount}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Sections Filter */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-        {sections.map((sec) => (
-          <button
-            key={sec}
-            onClick={() => setSelectedSection(sec)}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-              selectedSection === sec
-                ? 'bg-brand-navy dark:bg-brand-indigo text-white shadow-soft-xs'
-                : 'bg-slate-100 dark:bg-navy-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-navy-700'
-            }`}
-          >
-            {sec.replace('_', ' ')}
-          </button>
-        ))}
-      </div>
-
-      {/* Tables Grid */}
-      {loading ? (
-        <Card className="py-16 text-center text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-brand-indigo mb-2" />
-          <span className="text-xs font-medium">Loading restaurant floor plan...</span>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {filteredTables.map((table) => {
-            const badge = getTableStatusBadge(table.status);
-            const BadgeIcon = badge.icon;
-            return (
-              <div
-                key={table.id}
-                onClick={() => {
-                  setActiveTable(table);
-                  setNewStatus(table.status);
-                }}
-                className="bg-surface dark:bg-navy-800/60 border border-border dark:border-navy-700/80 rounded-xl p-3 cursor-pointer hover:border-brand-indigo hover:shadow-card-hover transition flex flex-col justify-between active:scale-[0.98]"
-              >
+      {/* 4. Interactive Table Floor Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
+        {filteredTables.map((table) => {
+          return (
+            <div
+              key={table.id}
+              onClick={() => {
+                setActiveTable(table);
+                setNewStatus(table.status);
+              }}
+              className={cn(
+                'p-3.5 rounded-xl border transition-all cursor-pointer select-none group flex flex-col justify-between h-32',
+                table.status === 'AVAILABLE' &&
+                  'bg-brand-surface dark:bg-brand-darkSurface border-[#16845B]/30 hover:border-[#16845B] hover:shadow-soft-md',
+                table.status === 'OCCUPIED' &&
+                  'bg-red-50/50 dark:bg-red-950/20 border-[#D44848]/30 hover:border-[#D44848] hover:shadow-soft-md',
+                table.status === 'RESERVED' &&
+                  'bg-amber-50/50 dark:bg-amber-950/20 border-[#C78B24]/30 hover:border-[#C78B24] hover:shadow-soft-md',
+                table.status === 'BILLED' &&
+                  'bg-blue-50/50 dark:bg-blue-950/20 border-[#2876C7]/30 hover:border-[#2876C7] hover:shadow-soft-md'
+              )}
+            >
+              <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                      T-{table.tableNumber}
-                    </span>
-                    <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
-                      {table.capacity} Seats
-                    </Badge>
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                    {table.section.replace('_', ' ')}
+                  <span className="font-mono font-bold text-sm text-brand-text">
+                    Table #{table.tableNumber}
+                  </span>
+                  <div className="text-[10px] text-brand-muted uppercase font-mono mt-0.5">
+                    {table.section.replace(/_/g, ' ')}
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-border/60 dark:border-navy-700">
-                  <Badge variant={badge.variant} dot size="sm" className="w-full justify-center">
-                    <BadgeIcon className="w-3 h-3 mr-1" />
-                    <span>{badge.label}</span>
-                  </Badge>
-                </div>
+                <StatusBadge status={table.status} dot={false} />
               </div>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Change Status Modal */}
+              <div className="pt-2 border-t border-brand-border dark:border-brand-darkBorder flex items-center justify-between text-[11px] text-brand-muted">
+                <span className="flex items-center space-x-1">
+                  <Users className="w-3 h-3 text-slate-400" />
+                  <span>{table.capacity} Seats</span>
+                </span>
+                <span className="text-[10px] text-brand-primary dark:text-[#8495FF] opacity-0 group-hover:opacity-100 transition-opacity font-semibold">
+                  Change &rarr;
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 5. Update Status Drawer */}
       {activeTable && (
-        <Modal
+        <FormDrawer
           isOpen={!!activeTable}
           onClose={() => setActiveTable(null)}
-          title={`Table ${activeTable.tableNumber} Status`}
-          subtitle={`Capacity: ${activeTable.capacity} Pax • Section: ${activeTable.section}`}
-          icon={<UtensilsCrossed className="w-4 h-4" />}
-          size="sm"
           onSubmit={handleUpdateStatus}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveTable(null)}
-                disabled={updating}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={updating}
-                isLoading={updating}
-                leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-              >
-                Save Status
-              </Button>
-            </>
-          }
+          title={`Update Table #${activeTable.tableNumber}`}
+          subtitle={`Floor: ${activeTable.section.replace(/_/g, ' ')} | Capacity: ${activeTable.capacity} Seats`}
+          submitText={updating ? 'Updating...' : 'Save Table Status'}
+          isLoading={updating}
+          width="md"
         >
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Update Dining Status
-            </label>
-            <Select
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-            >
-              <option value="AVAILABLE">Available &amp; Clean</option>
-              <option value="OCCUPIED">Occupied (Seated)</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="BILLED">Check Printed / Settling</option>
-            </Select>
-          </div>
-        </Modal>
+          <FormSection title="Dining Status" description="Select operational state for this table">
+            <div className="sm:col-span-2 space-y-2">
+              {[
+                { value: 'AVAILABLE', label: 'Available (Clean & Ready for Seating)', desc: 'Table is empty and cleared for new guests' },
+                { value: 'OCCUPIED', label: 'Occupied (Dining in Progress)', desc: 'Guests are seated, active order in service' },
+                { value: 'RESERVED', label: 'Reserved (Booked for Event)', desc: 'Table blocked for scheduled reservation' },
+                { value: 'BILLED', label: 'Check Printed (Awaiting Settlement)', desc: 'Bill has been presented to the guest' },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  className={cn(
+                    'p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all',
+                    newStatus === opt.value
+                      ? 'border-brand-primary bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-brand-primary'
+                      : 'border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface hover:bg-slate-50'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="tableStatus"
+                    value={opt.value}
+                    checked={newStatus === opt.value}
+                    onChange={(e) => setNewStatus(e.target.value)}
+                    className="mt-0.5 text-brand-primary focus:ring-brand-primary"
+                  />
+                  <div>
+                    <div className="font-bold text-xs text-brand-text">{opt.label}</div>
+                    <div className="text-[11px] text-brand-muted mt-0.5">{opt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </FormSection>
+        </FormDrawer>
       )}
     </PageContainer>
   );

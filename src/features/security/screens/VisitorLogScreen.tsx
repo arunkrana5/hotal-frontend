@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
-import { DynamicDropdown } from '@/components/dynamic-dropdown/DynamicDropdown';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import {
@@ -9,22 +7,27 @@ import {
   CheckInVisitorRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Input, Select, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
 import { useDocumentNumber } from '@/hooks/useDocumentNumber';
-import { DocumentNumberField } from '@/components/common/DocumentNumberField';
 import {
   ShieldCheck,
   Plus,
   LogOut,
   MapPin,
-  CheckCircle2,
+  Download,
+  AlertCircle,
+  Phone,
   Clock,
-  X,
-  UserCheck,
-  Users,
 } from 'lucide-react';
 
 export const VisitorLogScreen: React.FC = () => {
@@ -33,13 +36,18 @@ export const VisitorLogScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
 
-  // Modal
-  const [showModal, setShowModal] = useState<boolean>(false);
+  // Tabs & Filters
+  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [selectedVisitor, setSelectedVisitor] = useState<VisitorLogDto | null>(null);
   const { documentNumber: visNumber, isLoading: isVisLoading, refetch: refetchVis } = useDocumentNumber('VISITOR_PASS');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [newVisitor, setNewVisitor] = useState<CheckInVisitorRequest>({
     visitorName: '',
     idType: 'NATIONAL_ID',
@@ -51,14 +59,15 @@ export const VisitorLogScreen: React.FC = () => {
     badgeNumber: '',
   });
 
-  const fetchVisitors = async () => {
+  const fetchVisitors = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (search) query.append('search', search);
-    if (statusFilter) query.append('status', statusFilter);
+    if (search.trim()) query.append('search', search.trim());
+    if (activeTab === 'ON_PREMISES') query.append('status', 'CHECKED_IN');
+    if (activeTab === 'CHECKED_OUT') query.append('status', 'CHECKED_OUT');
 
     const res = await api.get<PagedResult<VisitorLogDto>>(`/security/visitors?${query.toString()}`);
     if (res.success && res.data) {
@@ -66,21 +75,28 @@ export const VisitorLogScreen: React.FC = () => {
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, activeTab]);
 
   useEffect(() => {
     fetchVisitors();
-  }, [pageIndex, pageSize, search, statusFilter]);
+  }, [fetchVisitors]);
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newVisitor.visitorName.trim()) {
+      setErrorMsg('Visitor name is required.');
+      return;
+    }
+
     setSubmitting(true);
+    setErrorMsg(null);
     const res = await api.post<VisitorLogDto>('/security/visitors/check-in', {
       ...newVisitor,
       badgeNumber: newVisitor.badgeNumber || visNumber,
     });
     if (res.success) {
-      setShowModal(false);
+      setShowCreateDrawer(false);
+      refetchVis();
       setNewVisitor({
         visitorName: '',
         idType: 'NATIONAL_ID',
@@ -92,99 +108,126 @@ export const VisitorLogScreen: React.FC = () => {
         badgeNumber: '',
       });
       fetchVisitors();
+    } else {
+      setErrorMsg(res.message || 'Visitor check-in failed.');
     }
     setSubmitting(false);
   };
 
-  const handleCheckOut = async (id: number) => {
-    await api.put(`/security/visitors/${id}/check-out`, {});
-    fetchVisitors();
+  const handleCheckOut = async (visitorId: number) => {
+    const res = await api.put(`/security/visitors/${visitorId}/check-out`, {});
+    if (res.success) {
+      fetchVisitors();
+    }
   };
 
-  const onSiteCount = visitors.filter(v => v.status === 'CHECKED_IN').length;
-
-  const columns = useMemo<ColumnDef<VisitorLogDto>[]>(
+  const columns: ColumnDef<VisitorLogDto>[] = useMemo(
     () => [
       {
         accessorKey: 'badgeNumber',
-        header: 'Pass #',
+        header: 'Badge / Pass #',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-            {(info.getValue() as string) || 'V-VISITOR'}
-          </span>
-        ),
-      },
-      {
-        accessorKey: 'visitorName',
-        header: 'Visitor Details',
-        cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{info.getValue() as string}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-              {info.row.original.phone || 'No phone'} • {info.row.original.idNumber}
-            </div>
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'purpose',
-        header: 'Visit Purpose',
-        cell: (info) => (
-          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate max-w-xs block">
+          <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
           </span>
         ),
       },
       {
-        accessorKey: 'roomOrArea',
-        header: 'Destination Area',
+        accessorKey: 'visitorName',
+        header: 'Visitor Identity',
         cell: (info) => (
-          <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            <span>{(info.getValue() as string) || info.row.original.visitingDepartment}</span>
+          <div>
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+              {info.getValue() as string}
+            </div>
+            {info.row.original.phone && (
+              <div className="text-[11px] font-mono text-brand-muted flex items-center space-x-1">
+                <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                <span>{info.row.original.phone}</span>
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'visitingDepartment',
+        header: 'Destination',
+        cell: ({ row }) => (
+          <div className="text-xs">
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              {row.original.visitingDepartment}
+            </span>
+            {row.original.roomOrArea && (
+              <div className="text-[11px] text-brand-muted">
+                Area: {row.original.roomOrArea}
+              </div>
+            )}
           </div>
         ),
       },
       {
         accessorKey: 'checkInTime',
-        header: 'Entry Time',
-        cell: (info) => (
-          <span className="text-xs font-mono text-slate-700 dark:text-slate-300">
-            {new Date(info.getValue() as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        ),
+        header: 'Check-In Stamp',
+        cell: (info) => {
+          const d = new Date(info.getValue() as string);
+          return (
+            <div className="text-xs font-mono">
+              <span className="font-medium text-brand-text">{d.toLocaleDateString()}</span>{' '}
+              <span className="text-[11px] text-brand-muted">{d.toLocaleTimeString()}</span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'checkOutTime',
+        header: 'Check-Out Stamp',
+        cell: (info) => {
+          const val = info.getValue() as string;
+          if (!val) return <span className="text-brand-muted italic text-[11px]">Still on premises</span>;
+          const d = new Date(val);
+          return (
+            <div className="text-xs font-mono">
+              <span className="font-medium text-brand-text">{d.toLocaleDateString()}</span>{' '}
+              <span className="text-[11px] text-brand-muted">{d.toLocaleTimeString()}</span>
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'status',
         header: 'Status',
         cell: (info) => {
           const s = (info.getValue() as string) || '';
-          return s === 'CHECKED_IN' ? (
-            <Badge variant="success" dot>On Premises</Badge>
-          ) : (
-            <Badge variant="neutral">Departed</Badge>
+          const isCheckedIn = s === 'CHECKED_IN' || s === 'IN';
+          return (
+            <StatusBadge
+              status={isCheckedIn ? 'INHOUSE' : 'CHECKEDOUT'}
+              label={isCheckedIn ? 'On Premises' : 'Departed'}
+            />
           );
         },
       },
       {
         id: 'actions',
-        header: 'Security Action',
-        cell: (info) => {
-          const v = info.row.original;
-          if (v.status === 'CHECKED_IN') {
-            return (
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => handleCheckOut(v.id)}
-                className="font-semibold text-xs flex items-center gap-1"
-              >
-                <LogOut className="w-3 h-3 text-rose-500" />
-                <span>Check Out</span>
-              </Button>
-            );
-          }
-          return <span className="text-xs text-slate-400 font-mono">&mdash;</span>;
+        header: '',
+        cell: ({ row }) => {
+          const isCheckedIn = row.original.status === 'CHECKED_IN' || row.original.status === 'IN';
+          return (
+            <div className="flex items-center space-x-2">
+              {isCheckedIn && (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => handleCheckOut(row.original.id)}
+                  className="text-[11px] h-7 text-[#D44848]"
+                  leftIcon={<LogOut className="w-3 h-3" />}
+                >
+                  Exit Gate
+                </Button>
+              )}
+              <RowActions onView={() => setSelectedVisitor(row.original)} />
+            </div>
+          );
         },
       },
     ],
@@ -193,245 +236,190 @@ export const VisitorLogScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Security', href: '/security/visitors' },
-          { label: 'Visitor Log' },
-        ]}
-        title="Hotel Security & Visitor Gatehouse"
-        subtitle="Visitor registration, access badge issuance, contractor verification & premises manifest"
+        title="Security & Visitor Access Logs"
+        badge={<StatusBadge status="ACTIVE" label="Perimeter Gate Control" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => setShowModal(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Register Gate Visitor
+              Export
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Issue Visitor Pass
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <Users className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Logged Entries
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount} Visitors
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: 'All Visitor Logs', count: totalCount },
+          { id: 'ON_PREMISES', label: 'Currently on Premises' },
+          { id: 'CHECKED_OUT', label: 'Departed Visitors' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <UserCheck className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Currently On Premises
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {onSiteCount} Inside
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search visitor name, badge #, department..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
-            <ShieldCheck className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Gatehouse Desk
-            </div>
-            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
-              Active Guard Shift
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50 shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Access Badges
-            </div>
-            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-              Passes Controlled
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Visitor Statuses</option>
-            <option value="CHECKED_IN">On Premises Only</option>
-            <option value="CHECKED_OUT">Departed</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Visitors DataTable */}
-      <DataTable<VisitorLogDto>
-        title="Visitor Gatehouse Register"
-        subtitle="Live security access records with national identity numbers and host departments"
+      {/* 4. Data Table */}
+      <DataTable
         data={visitors}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onSearchChange={(s) => {
-          setSearch(s);
-          setPageIndex(0);
-        }}
-        onRefresh={fetchVisitors}
-        searchPlaceholder="Filter visitors by name, pass, phone..."
-        exportFileName="visitor_log.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* Register Visitor Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Register Gate Visitor / Contractor"
-        subtitle="Verify government ID and issue security pass badge"
-        icon={<ShieldCheck className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Issue Visitor Pass Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCheckIn}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowModal(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !newVisitor.visitorName || !newVisitor.idNumber}
-              isLoading={submitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Issue Access Badge
-            </Button>
-          </>
-        }
+        title="Issue Security Visitor Pass"
+        subtitle="Record visitor credentials and destination before granting access"
+        submitText={submitting ? 'Issuing...' : 'Grant Access Pass'}
+        isLoading={submitting}
+        width="md"
       >
-        <DocumentNumberField
-          value={visNumber}
-          label="Visitor Gate Pass Number"
-          isLoading={isVisLoading}
-          onRefresh={refetchVis}
-          helperText="Auto-assigned sequentially by Security Access Engine"
-        />
-
-        <FormGrid cols={2}>
-          <Input
-            label="Visitor Full Name *"
-            required
-            value={newVisitor.visitorName}
-            onChange={(e) => setNewVisitor({ ...newVisitor, visitorName: e.target.value })}
-            placeholder="e.g. David Hassel"
-          />
-          <Input
-            label="Phone / Mobile *"
-            required
-            value={newVisitor.phone}
-            onChange={(e) => setNewVisitor({ ...newVisitor, phone: e.target.value })}
-            placeholder="+1 (555) 432-1098"
-          />
-        </FormGrid>
-
-        <FormGrid cols={3}>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              ID Document
-            </label>
-            <Select
-              value={newVisitor.idType}
-              onChange={(e) => setNewVisitor({ ...newVisitor, idType: e.target.value })}
-            >
-              <option value="NATIONAL_ID">National ID</option>
-              <option value="PASSPORT">Passport</option>
-              <option value="DRIVING_LICENSE">Driver's License</option>
-            </Select>
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
           </div>
+        )}
 
-          <Input
-            label="ID Number *"
-            required
-            value={newVisitor.idNumber}
-            onChange={(e) => setNewVisitor({ ...newVisitor, idNumber: e.target.value })}
-            placeholder="e.g. ID-89421"
-            className="font-mono"
-          />
-
-          <Input
-            label="Pass / Badge #"
-            value={newVisitor.badgeNumber}
-            onChange={(e) => setNewVisitor({ ...newVisitor, badgeNumber: e.target.value })}
-            placeholder="e.g. PASS-04"
-            className="font-mono"
-          />
-        </FormGrid>
-
-        <FormGrid cols={2}>
+        <FormSection title="Visitor Identity" description="Legal identification and contact">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Visiting Department
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Badge / Pass # (Auto)
             </label>
-            <DynamicDropdown
-              masterCode="DEPARTMENT"
-              value={newVisitor.visitingDepartment}
-              onChange={(val) => setNewVisitor({ ...newVisitor, visitingDepartment: val })}
-              placeholder="Select Department..."
+            <input
+              type="text"
+              readOnly
+              value={visNumber || 'Generating...'}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-slate-100 dark:bg-brand-darkCard dark:border-brand-darkBorder text-brand-primary dark:text-[#8495FF]"
             />
           </div>
 
-          <Input
-            label="Destination Room / Area"
-            value={newVisitor.roomOrArea}
-            onChange={(e) => setNewVisitor({ ...newVisitor, roomOrArea: e.target.value })}
-            placeholder="e.g. Suite 402 or Kitchen Dock"
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Visitor Full Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Michael Scott"
+              value={newVisitor.visitorName}
+              onChange={(e) => setNewVisitor({ ...newVisitor, visitorName: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-        <div>
-          <Input
-            label="Purpose of Visit *"
-            required
-            value={newVisitor.purpose}
-            onChange={(e) => setNewVisitor({ ...newVisitor, purpose: e.target.value })}
-            placeholder="e.g. Kitchen equipment inspection / Guest visitor"
-          />
-        </div>
-      </Modal>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              placeholder="+1 (555) 991-2831"
+              value={newVisitor.phone}
+              onChange={(e) => setNewVisitor({ ...newVisitor, phone: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Visiting Department *
+            </label>
+            <select
+              value={newVisitor.visitingDepartment}
+              onChange={(e) => setNewVisitor({ ...newVisitor, visitingDepartment: e.target.value })}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            >
+              <option value="FO">Front Office / Executive</option>
+              <option value="ENG">Engineering / Facilities</option>
+              <option value="FB">Kitchen &amp; Banquet</option>
+              <option value="HK">Housekeeping Stores</option>
+              <option value="HR">Human Resources</option>
+              <option value="IT">Server Room &amp; IT</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Visit Purpose / Destination Area
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Elevator annual safety inspection / Room 402 guest visitor"
+              value={newVisitor.purpose}
+              onChange={(e) => setNewVisitor({ ...newVisitor, purpose: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+      </FormDrawer>
+
+      {/* 6. Visitor Detail Drawer */}
+      {selectedVisitor && (
+        <DetailDrawer
+          isOpen={!!selectedVisitor}
+          onClose={() => setSelectedVisitor(null)}
+          title={selectedVisitor.visitorName}
+          subtitle={`Pass #${selectedVisitor.badgeNumber} | Destination: ${selectedVisitor.visitingDepartment}`}
+          status={selectedVisitor.status}
+          width="md"
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Check-In Time</span>
+                <span className="font-mono text-brand-text">{new Date(selectedVisitor.checkInTime).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Phone</span>
+                <span className="font-mono text-brand-text">{selectedVisitor.phone || 'N/A'}</span>
+              </div>
+            </div>
+
+            {selectedVisitor.purpose && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-0.5">Visit Purpose</span>
+                <p className="text-brand-text">{selectedVisitor.purpose}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

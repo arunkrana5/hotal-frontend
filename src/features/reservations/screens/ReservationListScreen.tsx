@@ -1,33 +1,46 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { ReservationDto } from '@/types/pms';
 import { PagedResult } from '@/types/common';
 import { DataTable } from '@/components/data-table/DataTable';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
-import { Select } from '@/components/common/Input';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  DetailDrawer,
+  FinancialSummary,
+} from '@/components/enterprise';
 import {
   CalendarCheck,
   Plus,
-  FileText,
-  Calendar,
-  CreditCard,
   Crown,
-  Users,
-  CheckCircle,
+  LogIn,
+  LogOut,
+  Calendar,
+  Bed,
+  User,
+  CreditCard,
+  Download,
 } from 'lucide-react';
 
 export const ReservationListScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [reservations, setReservations] = useState<ReservationDto[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusTab, setStatusTab] = useState<string>('ALL');
+  const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Detail Drawer
+  const [selectedBooking, setSelectedBooking] = useState<ReservationDto | null>(null);
 
   const fetchReservations = useCallback(async () => {
     setIsLoading(true);
@@ -37,7 +50,8 @@ export const ReservationListScreen: React.FC = () => {
         pageSize: pageSize.toString(),
       });
       if (search.trim()) params.append('search', search.trim());
-      if (statusFilter.trim()) params.append('status', statusFilter.trim());
+      if (statusTab !== 'ALL') params.append('status', statusTab);
+      if (sourceFilter !== 'ALL') params.append('bookingSource', sourceFilter);
 
       const res = await api.request<PagedResult<ReservationDto>>(
         `/pms/reservations?${params.toString()}`
@@ -49,266 +63,311 @@ export const ReservationListScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pageIndex, pageSize, search, statusFilter]);
+  }, [pageIndex, pageSize, search, statusTab, sourceFilter]);
 
   useEffect(() => {
     fetchReservations();
   }, [fetchReservations]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'CONF':
-        return <Badge variant="brand" dot>Confirmed</Badge>;
-      case 'CHKI':
-        return <Badge variant="success" dot>Checked In</Badge>;
-      case 'CHKO':
-        return <Badge variant="neutral">Checked Out</Badge>;
-      case 'CANC':
-        return <Badge variant="danger">Cancelled</Badge>;
-      case 'PROV':
-        return <Badge variant="warning">Provisional</Badge>;
-      default:
-        return <Badge variant="neutral">{status}</Badge>;
-    }
-  };
-
-  const columns: ColumnDef<ReservationDto>[] = [
-    {
-      accessorKey: 'confirmationNumber',
-      header: 'Booking #',
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-            {row.original.confirmationNumber}
-          </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            {row.original.bookingSource}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'guestName',
-      header: 'Guest Name',
-      cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-            <span>{row.original.guestName}</span>
-            {row.original.guestVip && row.original.guestVip !== 'Standard' && (
-              <Badge variant="warning" size="sm" className="font-bold flex items-center gap-0.5">
-                <Crown className="w-2.5 h-2.5 text-amber-500" />
-                <span>{row.original.guestVip}</span>
-              </Badge>
-            )}
+  const columns: ColumnDef<ReservationDto>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'confirmationNumber',
+        header: 'Booking #',
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
+              {row.original.confirmationNumber}
+            </span>
+            <span className="text-[10px] text-brand-muted uppercase font-mono">
+              {row.original.bookingSource || 'DIRECT'}
+            </span>
           </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-            {row.original.guestPhone || 'No contact'}
-          </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'roomTypeCode',
-      header: 'Room Type',
-      cell: ({ row }) => (
-        <Badge variant="neutral" size="sm" className="font-mono">
-          {row.original.roomTypeCode}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'assignedRoomNumber',
-      header: 'Assigned Room',
-      cell: ({ row }) =>
-        row.original.assignedRoomNumber ? (
-          <span className="font-mono font-semibold text-xs text-slate-900 dark:text-white">
-            Room {row.original.assignedRoomNumber}
-          </span>
-        ) : (
-          <span className="text-slate-400 text-xs italic">Unassigned</span>
         ),
-    },
-    {
-      accessorKey: 'checkInDate',
-      header: 'Stay Schedule',
-      cell: ({ row }) => (
-        <div className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>
-            {row.original.checkInDate} <span className="text-slate-400">&rarr;</span> {row.original.checkOutDate}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'totalEstimatedAmount',
-      header: 'Total Value',
-      cell: ({ row }) => (
-        <span className="font-semibold text-slate-900 dark:text-white">
-          ${Number(row.original.totalEstimatedAmount).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'balanceAmount',
-      header: 'Balance',
-      cell: ({ row }) => {
-        const bal = Number(row.original.balanceAmount || 0);
-        return bal > 0 ? (
-          <span className="font-mono font-semibold text-amber-600 dark:text-amber-400 text-xs">
-            ${bal.toFixed(2)}
-          </span>
-        ) : (
-          <Badge variant="success" size="sm">Prepaid</Badge>
-        );
       },
-    },
-    {
-      accessorKey: 'reservationStatus',
-      header: 'Status',
-      cell: ({ row }) => getStatusBadge(row.original.reservationStatus),
-    },
-    {
-      id: 'actions',
-      header: 'Folio',
-      cell: ({ row }) => (
-        <Link
-          to={`/front-office/folios?reservationId=${row.original.id}`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Ledger</span>
-        </Link>
-      ),
-    },
-  ];
+      {
+        accessorKey: 'guestName',
+        header: 'Guest Name',
+        cell: ({ row }) => (
+          <div>
+            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-xs">
+              <span>{row.original.guestName}</span>
+              {row.original.guestVip && row.original.guestVip !== 'Standard' && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                  <Crown className="w-2.5 h-2.5 text-amber-500" />
+                  <span>{row.original.guestVip}</span>
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-brand-muted">
+              {row.original.adultsCount} Adults{row.original.childrenCount ? `, ${row.original.childrenCount} Kids` : ''}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'roomTypeCode',
+        header: 'Room Allocation',
+        cell: ({ row }) => (
+          <div className="text-xs">
+            <div className="font-semibold text-slate-800 dark:text-slate-200">
+              {row.original.roomTypeCode}
+            </div>
+            <div className="text-[11px] font-mono text-brand-muted">
+              {row.original.assignedRoomNumber ? `Room #${row.original.assignedRoomNumber}` : 'Unallocated'}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'checkInDate',
+        header: 'Stay Schedule',
+        cell: ({ row }) => (
+          <div className="text-xs space-y-0.5 font-mono">
+            <div className="text-brand-text">
+              In: {new Date(row.original.checkInDate).toLocaleDateString()}
+            </div>
+            <div className="text-brand-muted text-[11px]">
+              Out: {new Date(row.original.checkOutDate).toLocaleDateString()}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'totalEstimatedAmount',
+        header: 'Folio Total',
+        cell: ({ row }) => (
+          <span className="font-mono font-bold text-xs text-brand-text">
+            ${row.original.totalEstimatedAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'balanceAmount',
+        header: 'Balance Due',
+        cell: ({ row }) => {
+          const bal = row.original.balanceAmount || 0;
+          return (
+            <span
+              className={`font-mono font-bold text-xs ${bal > 0 ? 'text-[#D44848] dark:text-[#F07878]' : 'text-[#16845B] dark:text-[#45C79A]'}`}
+            >
+              ${bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'reservationStatus',
+        header: 'Status',
+        cell: ({ row }) => <StatusBadge status={row.original.reservationStatus} />,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedBooking(row.original)}
+            customActions={[
+              ...(row.original.reservationStatus === 'CONF'
+                ? [
+                    {
+                      label: 'Check In Guest',
+                      icon: <LogIn className="w-3.5 h-3.5 text-[#16845B]" />,
+                      onClick: () => navigate('/front-office/arrivals'),
+                    },
+                  ]
+                : []),
+              ...(row.original.reservationStatus === 'CHKI'
+                ? [
+                    {
+                      label: 'Check Out Guest',
+                      icon: <LogOut className="w-3.5 h-3.5 text-[#C78B24]" />,
+                      onClick: () => navigate('/front-office/departures'),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        ),
+      },
+    ],
+    [navigate]
+  );
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Reservations', href: '/reservations' },
-          { label: 'Booking Registry' },
-        ]}
-        title="Reservations &amp; Central Registry"
-        subtitle="Reservation tracking, stay analytics, VIP classification, and room allocations"
-        icon={<CalendarCheck className="w-4 h-4" />}
-        badge={<Badge variant="info">PMS</Badge>}
+        title="Reservations Management"
+        badge={<StatusBadge status="ACTIVE" label="Central Reservation System" />}
         actions={
           <PageActions>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+            >
+              Export CSV
+            </Button>
             <Link to="/reservations/new">
               <Button
+                variant="primary"
                 size="sm"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                icon={<Plus className="w-3.5 h-3.5" />}
+                className="text-xs"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
               >
-                Create Reservation
+                Create Booking
               </Button>
             </Link>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
-            <CalendarCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Registrations
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount}
-            </div>
-          </div>
-        </Card>
+      {/* 2. High-Contrast Segmented Status Tabs */}
+      <PageTabs
+        activeTab={statusTab}
+        onChange={setStatusTab}
+        tabs={[
+          { id: 'ALL', label: 'All Bookings', count: totalCount },
+          { id: 'CONF', label: 'Confirmed' },
+          { id: 'CHKI', label: 'In-House (Checked In)' },
+          { id: 'CHKO', label: 'Checked Out' },
+          { id: 'PROV', label: 'Provisional' },
+          { id: 'CANC', label: 'Cancelled' },
+        ]}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-            <CheckCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              In-House Active
-            </div>
-            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {reservations.filter(r => r.reservationStatus === 'CHKI').length}
-            </div>
-          </div>
-        </Card>
+      {/* 3. Single-Row Filter Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search confirmation #, guest name, phone..."
+        filters={[
+          {
+            id: 'source',
+            label: 'Booking Source',
+            value: sourceFilter,
+            options: [
+              { label: 'All Sources', value: 'ALL' },
+              { label: 'Direct Booking', value: 'DIRECT' },
+              { label: 'OTA / Booking.com', value: 'OTA' },
+              { label: 'Corporate Contract', value: 'CORPORATE' },
+              { label: 'Travel Agent', value: 'AGENT' },
+            ],
+            onChange: setSourceFilter,
+          },
+        ]}
+        onResetFilters={() => {
+          setSearch('');
+          setSourceFilter('ALL');
+        }}
+        isFiltered={search !== '' || sourceFilter !== 'ALL'}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              VIP Patrons
-            </div>
-            <div className="text-xl font-bold text-purple-600 dark:text-purple-400 tracking-tight">
-              {reservations.filter(r => r.guestVip && r.guestVip !== 'Standard').length}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50">
-            <CreditCard className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Pre-Arrival Status
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {reservations.filter(r => r.reservationStatus === 'CONF').length} Confirmed
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-64">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Reservation Statuses</option>
-            <option value="CONF">Confirmed Only</option>
-            <option value="CHKI">Checked In (In-House)</option>
-            <option value="CHKO">Checked Out</option>
-            <option value="CANC">Cancelled</option>
-            <option value="PROV">Provisional</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* DataTable */}
-      <DataTable<ReservationDto>
-        title="Active Reservation Ledger"
-        subtitle="Full audit trail across direct bookings, corporate agreements, and OTAs"
+      {/* 4. Data Table */}
+      <DataTable
         data={reservations}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={isLoading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onSearchChange={(t) => {
-          setSearch(t);
-          setPageIndex(0);
-        }}
-        onRefresh={fetchReservations}
-        searchPlaceholder="Search confirmation # or guest..."
-        exportFileName="reservations_manifest.csv"
+        isLoading={isLoading}
+        enableSearch={false}
+        enableExport={true}
       />
+
+      {/* 5. Detail Drawer: Comprehensive Booking Inspection */}
+      {selectedBooking && (
+        <DetailDrawer
+          isOpen={!!selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          title={`Booking ${selectedBooking.confirmationNumber}`}
+          subtitle={`Guest: ${selectedBooking.guestName} | Source: ${selectedBooking.bookingSource || 'DIRECT'}`}
+          status={selectedBooking.reservationStatus}
+          width="lg"
+          actions={
+            <div className="flex items-center space-x-2">
+              {selectedBooking.reservationStatus === 'CONF' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate('/front-office/arrivals')}
+                  leftIcon={<LogIn className="w-3.5 h-3.5" />}
+                  className="text-xs"
+                >
+                  Proceed to Check-In
+                </Button>
+              )}
+              {selectedBooking.reservationStatus === 'CHKI' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate('/front-office/departures')}
+                  leftIcon={<LogOut className="w-3.5 h-3.5" />}
+                  className="text-xs"
+                >
+                  Proceed to Check-Out
+                </Button>
+              )}
+              <Link to="/front-office/folios">
+                <Button variant="outline" size="sm" className="text-xs" leftIcon={<CreditCard className="w-3.5 h-3.5" />}>
+                  Open Folio
+                </Button>
+              </Link>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Stay Details Card */}
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Check-In Date</span>
+                <span className="font-semibold text-brand-text">
+                  {new Date(selectedBooking.checkInDate).toLocaleDateString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Check-Out Date</span>
+                <span className="font-semibold text-brand-text">
+                  {new Date(selectedBooking.checkOutDate).toLocaleDateString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Room Type</span>
+                <span className="font-semibold text-brand-text">{selectedBooking.roomTypeCode}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Room Assigned</span>
+                <span className="font-mono font-bold text-brand-primary dark:text-[#8495FF]">
+                  {selectedBooking.assignedRoomNumber ? `#${selectedBooking.assignedRoomNumber}` : 'Pending Check-In'}
+                </span>
+              </div>
+            </div>
+
+            {/* Financial Breakdown */}
+            <FinancialSummary
+              subtotal={selectedBooking.totalEstimatedAmount || 0}
+              grandTotal={selectedBooking.totalEstimatedAmount || 0}
+              amountPaid={(selectedBooking.totalEstimatedAmount || 0) - (selectedBooking.balanceAmount || 0)}
+              balanceDue={selectedBooking.balanceAmount || 0}
+            />
+
+            {/* Special Preferences & Notes */}
+            {selectedBooking.specialRequests && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-1">
+                  Special Guest Requests
+                </span>
+                <p className="text-xs text-brand-text leading-relaxed">{selectedBooking.specialRequests}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

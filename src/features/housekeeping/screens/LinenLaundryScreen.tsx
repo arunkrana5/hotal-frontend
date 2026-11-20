@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import {
@@ -10,39 +9,48 @@ import {
 } from '@/types/operations';
 import { RoomDto } from '@/types/pms';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
-import { Input, Select, Textarea, FormGrid } from '@/components/common/Input';
 import {
-  Layers,
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+  FinancialSummary,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
+import {
   Shirt,
+  Layers,
   Plus,
-  RefreshCw,
-  Truck,
-  X,
   Trash2,
-  Sparkles,
   CheckCircle2,
-  Package,
+  Truck,
+  Download,
+  AlertCircle,
+  DoorOpen,
 } from 'lucide-react';
 
 export const LinenLaundryScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'LINEN' | 'LAUNDRY'>('LINEN');
 
-  // Linen
+  // Linen State
   const [linenItems, setLinenItems] = useState<LinenItemDto[]>([]);
   const [linenLoading, setLinenLoading] = useState<boolean>(true);
 
-  // Laundry
+  // Laundry Orders State
   const [orders, setOrders] = useState<LaundryOrderDto[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [laundryLoading, setLaundryLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>('');
 
-  // Laundry Order Modal
-  const [showOrderModal, setShowOrderModal] = useState<boolean>(false);
+  // Modals & Drawers
+  const [showOrderDrawer, setShowOrderDrawer] = useState<boolean>(false);
+  const [selectedOrder, setSelectedOrder] = useState<LaundryOrderDto | null>(null);
   const [orderSubmitting, setOrderSubmitting] = useState<boolean>(false);
   const [rooms, setRooms] = useState<RoomDto[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | ''>('');
@@ -52,35 +60,37 @@ export const LinenLaundryScreen: React.FC = () => {
     { serviceType: 'WASH_AND_FOLD', garmentName: 'Cotton Dress Shirt', quantity: 2, unitPrice: 8.0, remarks: '' },
   ]);
 
-  const fetchLinen = async () => {
+  const fetchLinen = useCallback(async () => {
     setLinenLoading(true);
     const res = await api.get<LinenItemDto[]>('/housekeeping/linen');
     if (res.success && res.data) {
       setLinenItems(res.data);
     }
     setLinenLoading(false);
-  };
+  }, []);
 
-  const fetchLaundryOrders = async () => {
+  const fetchLaundryOrders = useCallback(async () => {
     setLaundryLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
+    if (search.trim()) query.append('search', search.trim());
+
     const res = await api.get<PagedResult<LaundryOrderDto>>(`/housekeeping/laundry?${query.toString()}`);
     if (res.success && res.data) {
       setOrders(res.data.items);
       setTotalCount(res.data.totalCount);
     }
     setLaundryLoading(false);
-  };
+  }, [pageIndex, pageSize, search]);
 
   useEffect(() => {
     if (activeTab === 'LINEN') fetchLinen();
     else fetchLaundryOrders();
-  }, [activeTab, pageIndex, pageSize]);
+  }, [activeTab, fetchLinen, fetchLaundryOrders]);
 
-  const loadOccupiedRooms = async () => {
+  const loadRooms = async () => {
     const res = await api.get<PagedResult<RoomDto>>('/pms/rooms?status=OCC&pageSize=50');
     if (res.success && res.data) {
       setRooms(res.data.items);
@@ -90,159 +100,127 @@ export const LinenLaundryScreen: React.FC = () => {
     }
   };
 
+  const handleOpenOrderDrawer = () => {
+    loadRooms();
+    setShowOrderDrawer(true);
+  };
+
   const handleAddItem = () => {
-    setOrderItems((prev) => [
-      ...prev,
-      { serviceType: 'WASH_AND_FOLD', garmentName: '', quantity: 1, unitPrice: 10.0, remarks: '' },
+    setOrderItems([
+      ...orderItems,
+      { serviceType: 'DRY_CLEAN', garmentName: 'Wool Trousers', quantity: 1, unitPrice: 12.0, remarks: '' },
     ]);
   };
 
-  const handleRemoveItem = (index: number) => {
-    setOrderItems((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveItem = (idx: number) => {
+    if (orderItems.length <= 1) return;
+    setOrderItems(orderItems.filter((_, i) => i !== idx));
   };
 
-  const handleCreateLaundryOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOrderSubmitting(true);
+  const handleItemChange = (idx: number, field: keyof CreateLaundryOrderItemRequest, val: any) => {
+    const updated = [...orderItems];
+    updated[idx] = { ...updated[idx], [field]: val };
+    setOrderItems(updated);
+  };
 
-    const res = await api.post('/housekeeping/laundry', {
-      roomId: selectedRoomId ? Number(selectedRoomId) : null,
+  const totalOrderAmount = useMemo(
+    () => orderItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+    [orderItems]
+  );
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRoomId) return;
+
+    setOrderSubmitting(true);
+    const payload = {
+      roomId: Number(selectedRoomId),
       isExpress,
       specialInstructions,
       items: orderItems,
-    });
-    setOrderSubmitting(false);
+    };
 
+    const res = await api.post('/housekeeping/laundry', payload);
     if (res.success) {
-      setShowOrderModal(false);
-      setSelectedRoomId('');
-      setSpecialInstructions('');
-      setOrderItems([{ serviceType: 'WASH_AND_FOLD', garmentName: 'Cotton Dress Shirt', quantity: 2, unitPrice: 8.0, remarks: '' }]);
-      await fetchLaundryOrders();
+      setShowOrderDrawer(false);
+      fetchLaundryOrders();
     }
+    setOrderSubmitting(false);
   };
 
-  const handleUpdateLaundryStatus = async (orderId: number, status: string) => {
+  const handleUpdateOrderStatus = async (orderId: number, status: string) => {
     const res = await api.put(`/housekeeping/laundry/${orderId}/status`, { status });
     if (res.success) {
-      await fetchLaundryOrders();
+      fetchLaundryOrders();
     }
   };
 
-  const laundryColumns = useMemo<ColumnDef<LaundryOrderDto>[]>(
+  // Linen Columns
+  const linenColumns: ColumnDef<LinenItemDto>[] = useMemo(
     () => [
       {
-        accessorKey: 'orderNumber',
-        header: 'Order #',
+        accessorKey: 'itemName',
+        header: 'Linen Item',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <div className="font-semibold text-slate-900 dark:text-white text-xs">
+            {info.getValue() as string}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'category',
+        header: 'Classification',
+        cell: (info) => (
+          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
             {info.getValue() as string}
           </span>
         ),
       },
       {
-        accessorKey: 'roomNumber',
-        header: 'Room & Guest',
-        cell: (info) => {
-          const row = info.row.original;
-          return (
-            <div>
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {row.roomNumber ? `Room ${row.roomNumber}` : 'Hotel Staff Linen'}
-              </span>
-              {row.guestName && (
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">{row.guestName}</div>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'isExpress',
-        header: 'Service Speed',
-        cell: (info) => {
-          const express = info.getValue() as boolean;
-          return express ? (
-            <Badge variant="purple" size="sm" dot>Express (4h)</Badge>
-          ) : (
-            <Badge variant="neutral" size="sm">Standard (24h)</Badge>
-          );
-        },
-      },
-      {
-        accessorKey: 'totalItemsCount',
-        header: 'Total Garments',
+        accessorKey: 'totalStock',
+        header: 'Total Par',
         cell: (info) => (
-          <Badge variant="neutral" size="sm" className="font-mono">
-            {info.getValue() as number} Pcs
-          </Badge>
-        ),
-      },
-      {
-        accessorKey: 'totalAmount',
-        header: 'Folio Charge',
-        cell: (info) => (
-          <span className="font-bold text-slate-900 dark:text-white font-mono text-xs">
-            ${(info.getValue() as number).toFixed(2)}
+          <span className="font-mono font-bold text-xs text-brand-text">
+            {info.getValue() as number}
           </span>
         ),
       },
       {
-        accessorKey: 'status',
-        header: 'Order Status',
-        cell: (info) => {
-          const s = (info.getValue() as string) || '';
-          if (s === 'RECEIVED') return <Badge variant="warning" dot>Received</Badge>;
-          if (s === 'PROCESSING' || s === 'IN_WASH') return <Badge variant="brand" dot>In Wash / Ironing</Badge>;
-          if (s === 'READY_FOR_DELIVERY') return <Badge variant="purple" dot>Ready</Badge>;
-          if (s === 'DELIVERED') return <Badge variant="success">Delivered</Badge>;
-          return <Badge variant="neutral">{s}</Badge>;
-        },
+        accessorKey: 'cleanStock',
+        header: 'Available Clean',
+        cell: (info) => (
+          <span className="font-mono font-bold text-xs text-[#16845B] dark:text-[#45C79A]">
+            {info.getValue() as number}
+          </span>
+        ),
       },
       {
-        id: 'actions',
-        header: 'Workflow',
-        cell: (info) => {
-          const ord = info.row.original;
-          return (
-            <div className="flex items-center gap-1.5">
-              {ord.status === 'RECEIVED' && (
-                <Button
-                  size="xs"
-                  onClick={() => handleUpdateLaundryStatus(ord.id, 'PROCESSING')}
-                  className="font-semibold text-xs"
-                >
-                  Process
-                </Button>
-              )}
-              {ord.status === 'PROCESSING' && (
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  onClick={() => handleUpdateLaundryStatus(ord.id, 'READY_FOR_DELIVERY')}
-                  className="font-semibold text-xs"
-                >
-                  Ready
-                </Button>
-              )}
-              {ord.status === 'READY_FOR_DELIVERY' && (
-                <Button
-                  size="xs"
-                  variant="success"
-                  onClick={() => handleUpdateLaundryStatus(ord.id, 'DELIVERED')}
-                  className="font-semibold text-xs flex items-center gap-1"
-                >
-                  <Truck className="w-3 h-3" />
-                  <span>Deliver</span>
-                </Button>
-              )}
-              {ord.status === 'DELIVERED' && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Closed</span>
-                </span>
-              )}
-            </div>
+        accessorKey: 'soiledStock',
+        header: 'Soiled / Wash',
+        cell: (info) => (
+          <span className="font-mono font-bold text-xs text-[#C78B24] dark:text-[#E7B65A]">
+            {info.getValue() as number}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'inLaundryStock',
+        header: 'At Commercial Laundry',
+        cell: (info) => (
+          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+            {info.getValue() as number}
+          </span>
+        ),
+      },
+      {
+        id: 'parAlert',
+        header: 'Par Status',
+        cell: ({ row }) => {
+          const isLow = row.original.cleanStock < row.original.parLevel;
+          return isLow ? (
+            <StatusBadge status="WARNING" label="Low Par Alert" />
+          ) : (
+            <StatusBadge status="CLEAN" label="Nominal" />
           );
         },
       },
@@ -250,342 +228,333 @@ export const LinenLaundryScreen: React.FC = () => {
     []
   );
 
-  return (
-    <PageContainer>
-      {/* Universal Compact Page Header */}
-      <PageHeader
-        breadcrumb={[
-          { label: 'Housekeeping', href: '/housekeeping/status' },
-          { label: 'Linen & Valet Laundry' },
-        ]}
-        title="Linen Inventory &amp; Valet Laundry"
-        subtitle="Par level stock, laundry circulation, valet pressing, and guest folio billing"
-        icon={<Shirt className="w-4 h-4" />}
-        badge={<Badge variant="teal">Housekeeping</Badge>}
-        actions={
-          <PageActions>
-            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-navy-800 rounded-lg text-xs">
-              <button
-                onClick={() => setActiveTab('LINEN')}
-                className={`px-3 py-1 rounded-md font-semibold transition ${
-                  activeTab === 'LINEN'
-                    ? 'bg-surface dark:bg-navy-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                Linen Par Inventory
-              </button>
-              <button
-                onClick={() => setActiveTab('LAUNDRY')}
-                className={`px-3 py-1 rounded-md font-semibold transition ${
-                  activeTab === 'LAUNDRY'
-                    ? 'bg-surface dark:bg-navy-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                Guest Valet Orders
-              </button>
-            </div>
-
-            {activeTab === 'LAUNDRY' && (
+  // Laundry Orders Columns
+  const laundryColumns: ColumnDef<LaundryOrderDto>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'orderNumber',
+        header: 'Order #',
+        cell: (info) => (
+          <div className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
+            {info.getValue() as string}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'roomNumber',
+        header: 'Guest Room',
+        cell: (info) => (
+          <div className="flex items-center space-x-1.5 font-mono text-xs">
+            <DoorOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="font-bold text-brand-text">#{info.getValue() as string}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'guestName',
+        header: 'Guest Name',
+        cell: (info) => (
+          <div className="font-semibold text-slate-900 dark:text-white text-xs">
+            {info.getValue() as string}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'totalAmount',
+        header: 'Charge ($)',
+        cell: (info) => (
+          <span className="font-mono font-bold text-xs text-brand-text">
+            ${(info.getValue() as number).toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'isExpress',
+        header: 'Service Speed',
+        cell: (info) => (
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${info.getValue() ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}
+          >
+            {info.getValue() ? 'Express 4-Hr' : 'Standard 24-Hr'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: (info) => <StatusBadge status={info.getValue() as string} />,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center space-x-2">
+            {row.original.status === 'RECEIVED' && (
               <Button
-                size="sm"
-                onClick={() => {
-                  loadOccupiedRooms();
-                  setShowOrderModal(true);
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                icon={<Plus className="w-3.5 h-3.5" />}
+                variant="outline"
+                size="xs"
+                onClick={() => handleUpdateOrderStatus(row.original.id, 'WASHING')}
+                className="text-[11px] h-7"
               >
-                New Valet Order
+                Start Wash
               </Button>
             )}
+
+            {row.original.status === 'WASHING' && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => handleUpdateOrderStatus(row.original.id, 'READY')}
+                className="text-[11px] h-7 text-[#16845B]"
+              >
+                Ready
+              </Button>
+            )}
+
+            {row.original.status === 'READY' && (
+              <Button
+                variant="primary"
+                size="xs"
+                onClick={() => handleUpdateOrderStatus(row.original.id, 'DELIVERED')}
+                className="text-[11px] h-7"
+              >
+                Deliver
+              </Button>
+            )}
+
+            <RowActions onView={() => setSelectedOrder(row.original)} />
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
+  return (
+    <PageContainer>
+      {/* 1. Header */}
+      <PageHeader
+        title="Linen & Laundry Operations"
+        badge={<StatusBadge status="ACTIVE" label="Housekeeping Facilities" />}
+        actions={
+          <PageActions>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+            >
+              Export
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenOrderDrawer}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              New Guest Laundry Ticket
+            </Button>
           </PageActions>
         }
       />
 
-      {/* Linen Inventory View */}
-      {activeTab === 'LINEN' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-4 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
-                <Package className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Total Linen Items
-                </div>
-                <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-                  {linenItems.length} SKUs
-                </div>
-              </div>
-            </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={(tab) => setActiveTab(tab as any)}
+        tabs={[
+          { id: 'LINEN', label: 'Hotel Linen Inventory', count: linenItems.length, icon: <Layers className="w-3.5 h-3.5" /> },
+          { id: 'LAUNDRY', label: 'Guest Laundry Orders', count: totalCount, icon: <Shirt className="w-3.5 h-3.5" /> },
+        ]}
+      />
 
-            <Card className="p-4 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Clean &amp; Circulating
-                </div>
-                <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-                  {linenItems.reduce((acc, i) => acc + (i.cleanStock || 0), 0)} Pcs
-                </div>
-              </div>
-            </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={activeTab === 'LINEN' ? 'Filter linen items...' : 'Search laundry order #, room #...'}
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-            <Card className="p-4 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-100 dark:border-rose-900/50">
-                <Truck className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  In Commercial Laundry
-                </div>
-                <div className="text-xl font-bold text-rose-600 dark:text-rose-400 tracking-tight">
-                  {linenItems.reduce((acc, i) => acc + (i.inLaundryStock || 0), 0)} Pcs
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Target Par Level
-                </div>
-                <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1">
-                  3.5x Total Occupancy
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <Card className="overflow-hidden">
-            <div className="px-5 py-4 border-b border-border dark:border-border flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
-                  Linen Master &amp; Circulating Par Stock
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Par balance across linen chutes, guest rooms, and external commercial laundry
-                </p>
-              </div>
-              <Button size="xs" variant="secondary" onClick={fetchLinen} className="font-semibold flex items-center gap-1">
-                <RefreshCw className={`w-3 h-3 ${linenLoading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </Button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-border dark:border-border bg-slate-50/80 dark:bg-navy-800/50 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-                    <th className="px-4 py-3">Item Code</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Description</th>
-                    <th className="px-4 py-3 text-right">Target Par</th>
-                    <th className="px-4 py-3 text-right">Clean in Stores</th>
-                    <th className="px-4 py-3 text-right">In Rooms</th>
-                    <th className="px-4 py-3 text-right">Dirty / In Wash</th>
-                    <th className="px-4 py-3 text-right">Total Inventory</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 dark:divide-navy-800">
-                  {linenItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-navy-800/40 transition">
-                      <td className="px-4 py-3 font-mono font-bold text-blue-600 dark:text-blue-400">
-                        {item.itemCode}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="neutral" size="sm">{item.category}</Badge>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
-                        {item.itemName}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-300">
-                        {item.parLevel}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                        {item.cleanStock}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300">
-                        {item.inUseStock}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-rose-600 dark:text-rose-400 font-semibold">
-                        {item.inLaundryStock}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                        {item.cleanStock + item.inUseStock + item.inLaundryStock}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Guest Laundry Orders View */}
-      {activeTab === 'LAUNDRY' && (
-        <DataTable<LaundryOrderDto>
-          title="Guest Valet Laundry &amp; Dry Cleaning Orders"
-          subtitle="Real-time valet manifests linked with guest room folios"
+      {/* 4. Main Table */}
+      {activeTab === 'LINEN' ? (
+        <DataTable
+          data={linenItems}
+          columns={linenColumns}
+          totalCount={linenItems.length}
+          pageIndex={0}
+          pageSize={50}
+          onPageChange={() => {}}
+          onPageSizeChange={() => {}}
+          isLoading={linenLoading}
+          enableSearch={false}
+          enableExport={true}
+        />
+      ) : (
+        <DataTable
           data={orders}
           columns={laundryColumns}
           totalCount={totalCount}
           pageIndex={pageIndex}
           pageSize={pageSize}
-          isLoading={laundryLoading}
           onPageChange={setPageIndex}
           onPageSizeChange={setPageSize}
-          onRefresh={fetchLaundryOrders}
-          exportFileName="valet_laundry_orders.csv"
+          isLoading={laundryLoading}
+          enableSearch={false}
+          enableExport={true}
         />
       )}
 
-      {/* New Laundry Order Modal */}
-      <Modal
-        isOpen={showOrderModal}
-        onClose={() => setShowOrderModal(false)}
-        title="Create Guest Valet Laundry Ticket"
-        subtitle="Garment line items will be auto-posted to the guest's active PMS folio"
-        icon={<Shirt className="w-4 h-4" />}
-        size="lg"
-        onSubmit={handleCreateLaundryOrder}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOrderModal(false)}
-              disabled={orderSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={orderSubmitting}
-              isLoading={orderSubmitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Submit Laundry Order
-            </Button>
-          </>
-        }
+      {/* 5. Create Guest Laundry Order Drawer */}
+      <FormDrawer
+        isOpen={showOrderDrawer}
+        onClose={() => setShowOrderDrawer(false)}
+        onSubmit={handleCreateOrder}
+        title="New Guest Laundry Order"
+        subtitle="Collect and register guest garment laundering ticket"
+        submitText={orderSubmitting ? 'Creating...' : 'Register Ticket'}
+        isLoading={orderSubmitting}
+        width="lg"
       >
-        <FormGrid cols={2}>
+        <FormSection title="Room Assignment" description="Occupied room and priority">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Guest Room
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Guest Room *
             </label>
-            <Select
+            <select
               value={selectedRoomId}
               onChange={(e) => setSelectedRoomId(Number(e.target.value))}
+              required
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
-              <option value="">Hotel Internal Housekeeping</option>
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>
-                  Room {r.roomNumber} (Floor {r.floorNumber})
+                  Room #{r.roomNumber} - {r.roomTypeCode} (Occupied)
                 </option>
               ))}
-            </Select>
+            </select>
           </div>
 
-          <div className="flex items-center pt-6">
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Express Delivery (+50% fee)
+            </label>
+            <div className="flex items-center space-x-2 h-8">
               <input
                 type="checkbox"
                 checked={isExpress}
                 onChange={(e) => setIsExpress(e.target.checked)}
-                className="rounded border-slate-300 text-brand-indigo focus:ring-brand-indigo"
+                className="rounded border-slate-300 text-brand-primary h-4 w-4"
               />
-              <span>Express 4-Hour Service (+50% Surcharge)</span>
-            </label>
+              <span className="text-xs text-brand-text font-medium">Rush 4-Hour Service</span>
+            </div>
           </div>
-        </FormGrid>
+        </FormSection>
 
-        {/* Garment Line Items */}
-        <div className="space-y-3 pt-2 border-t border-border dark:border-navy-800">
+        {/* Garment Items Editor */}
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-900 dark:text-white">Garments &amp; Services</span>
-            <Button type="button" size="xs" variant="outline" onClick={handleAddItem} leftIcon={<Plus className="w-3 h-3" />}>
-              Add Item
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+              Garments &amp; Services
+            </h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={handleAddItem}
+              className="text-[11px]"
+              leftIcon={<Plus className="w-3 h-3" />}
+            >
+              Add Garment
             </Button>
           </div>
 
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <div className="space-y-2">
             {orderItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-navy-800/60 p-2.5 rounded-xl border border-border dark:border-navy-700">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Garment name..."
+              <div
+                key={idx}
+                className="p-2.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface grid grid-cols-12 gap-2 items-center text-xs"
+              >
+                <div className="col-span-5">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Garment Name (e.g. Silk Shirt)"
                     value={item.garmentName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setOrderItems((prev) => prev.map((p, i) => (i === idx ? { ...p, garmentName: val } : p)));
-                    }}
-                    className="h-8 text-xs"
+                    onChange={(e) => handleItemChange(idx, 'garmentName', e.target.value)}
+                    className="w-full h-7 px-2 text-xs rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                <div className="w-20">
-                  <Input
+
+                <div className="col-span-3">
+                  <select
+                    value={item.serviceType}
+                    onChange={(e) => handleItemChange(idx, 'serviceType', e.target.value)}
+                    className="w-full h-7 px-1.5 text-xs rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
+                  >
+                    <option value="WASH_AND_FOLD">Wash &amp; Fold</option>
+                    <option value="DRY_CLEAN">Dry Clean</option>
+                    <option value="PRESS_ONLY">Press Only</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <input
                     type="number"
                     min="1"
-                    placeholder="Qty"
                     value={item.quantity}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setOrderItems((prev) => prev.map((p, i) => (i === idx ? { ...p, quantity: val } : p)));
-                    }}
-                    className="h-8 text-xs font-mono"
+                    onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
+                    className="w-full h-7 px-1.5 text-xs text-center font-mono rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                <div className="w-24">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Price"
-                    value={item.unitPrice}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setOrderItems((prev) => prev.map((p, i) => (i === idx ? { ...p, unitPrice: val } : p)));
-                    }}
-                    className="h-8 text-xs font-mono"
-                  />
+
+                <div className="col-span-2 text-right flex items-center justify-end space-x-1">
+                  <span className="font-mono font-bold text-xs">
+                    ${(item.quantity * item.unitPrice).toFixed(2)}
+                  </span>
+                  {orderItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(idx)}
+                      className="p-1 rounded text-slate-400 hover:text-[#D44848]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-                {orderItems.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(idx)}
-                    className="p-1.5 text-slate-400 hover:text-danger rounded-lg transition shrink-0"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
               </div>
             ))}
           </div>
         </div>
 
-        <div>
-          <Textarea
-            label="Special Instructions"
-            rows={2}
-            value={specialInstructions}
-            onChange={(e) => setSpecialInstructions(e.target.value)}
-            placeholder="e.g. Heavy starch on shirt collars; delicate silk wash for blouse..."
+        {/* Financial Summary */}
+        <FinancialSummary
+          subtotal={totalOrderAmount}
+          grandTotal={totalOrderAmount * (isExpress ? 1.5 : 1)}
+          balanceDue={totalOrderAmount * (isExpress ? 1.5 : 1)}
+        />
+      </FormDrawer>
+
+      {/* 6. Order Detail Drawer */}
+      {selectedOrder && (
+        <DetailDrawer
+          isOpen={!!selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          title={`Laundry Ticket #${selectedOrder.orderNumber}`}
+          subtitle={`Room #${selectedOrder.roomNumber} &bull; Guest: ${selectedOrder.guestName}`}
+          status={selectedOrder.status}
+          width="md"
+        >
+          <FinancialSummary
+            subtotal={selectedOrder.totalAmount}
+            grandTotal={selectedOrder.totalAmount}
+            balanceDue={selectedOrder.totalAmount}
           />
-        </div>
-      </Modal>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

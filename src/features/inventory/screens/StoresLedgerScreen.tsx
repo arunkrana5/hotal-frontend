@@ -1,22 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import { StockTransactionDto } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Select } from '@/components/common/Input';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  DetailDrawer,
+  LedgerSummary,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
+import {
   Boxes,
-  RefreshCw,
   ArrowDownLeft,
   ArrowUpRight,
-  SlidersHorizontal,
   PackageCheck,
-  TrendingDown,
-  TrendingUp,
+  Download,
+  AlertCircle,
+  FileText,
 } from 'lucide-react';
 
 export const StoresLedgerScreen: React.FC = () => {
@@ -25,15 +30,22 @@ export const StoresLedgerScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
-  const [typeFilter, setTypeFilter] = useState<string>('');
 
-  const fetchTransactions = async () => {
+  // Tabs & Filters
+  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+
+  // Detail Drawer
+  const [selectedTx, setSelectedTx] = useState<StockTransactionDto | null>(null);
+
+  const fetchTransactions = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (typeFilter) query.append('transactionType', typeFilter);
+    if (search.trim()) query.append('search', search.trim());
+    if (activeTab !== 'ALL') query.append('transactionType', activeTab);
 
     const res = await api.get<PagedResult<StockTransactionDto>>(
       `/inventory/transactions?${query.toString()}`
@@ -43,22 +55,28 @@ export const StoresLedgerScreen: React.FC = () => {
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, activeTab]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [pageIndex, pageSize, typeFilter]);
+  }, [fetchTransactions]);
 
-  const receiptCount = transactions.filter(t => t.transactionType === 'RECEIPT').length;
-  const issueCount = transactions.filter(t => t.transactionType === 'ISSUE').length;
+  const totalReceipts = useMemo(
+    () => transactions.filter((t) => t.transactionType === 'RECEIPT').reduce((sum, t) => sum + t.quantity, 0),
+    [transactions]
+  );
+  const totalIssues = useMemo(
+    () => transactions.filter((t) => t.transactionType === 'ISSUE').reduce((sum, t) => sum + t.quantity, 0),
+    [transactions]
+  );
 
-  const columns = useMemo<ColumnDef<StockTransactionDto>[]>(
+  const columns: ColumnDef<StockTransactionDto>[] = useMemo(
     () => [
       {
         accessorKey: 'transactionNumber',
         header: 'Tx Number',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
           </span>
         ),
@@ -69,92 +87,81 @@ export const StoresLedgerScreen: React.FC = () => {
         cell: (info) => {
           const date = new Date(info.getValue() as string);
           return (
-            <div className="text-xs">
-              <div className="font-medium text-slate-800 dark:text-slate-200">{date.toLocaleDateString()}</div>
-              <div className="text-[11px] text-slate-400 font-mono">{date.toLocaleTimeString()}</div>
+            <div className="text-xs font-mono">
+              <div className="font-medium text-brand-text">{date.toLocaleDateString()}</div>
+              <div className="text-[11px] text-brand-muted">{date.toLocaleTimeString()}</div>
             </div>
           );
         },
       },
       {
-        accessorKey: 'itemCode',
-        header: 'SKU & Description',
+        accessorKey: 'itemName',
+        header: 'Inventory SKU',
         cell: (info) => (
           <div>
-            <span className="font-mono font-bold text-xs text-slate-700 dark:text-slate-300">
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">
               {info.getValue() as string}
-            </span>
-            <div className="text-xs text-slate-900 dark:text-white font-medium">{info.row.original.itemName}</div>
+            </div>
+            <div className="text-[11px] font-mono text-brand-muted">
+              Code: {info.row.original.itemCode}
+            </div>
           </div>
         ),
       },
       {
+        accessorKey: 'departmentCode',
+        header: 'Department',
+        cell: (info) => (
+          <span className="font-mono text-xs text-brand-text">
+            {info.getValue() as string || 'CENTRAL_STORES'}
+          </span>
+        ),
+      },
+      {
         accessorKey: 'transactionType',
-        header: 'Movement Type',
+        header: 'Type',
         cell: (info) => {
-          const type = (info.getValue() as string) || '';
-          if (type === 'RECEIPT') {
-            return (
-              <Badge variant="success" size="sm" className="flex items-center gap-1 font-semibold">
-                <ArrowDownLeft className="w-3 h-3" />
-                <span>Receipt (+)</span>
-              </Badge>
-            );
-          }
-          if (type === 'ISSUE') {
-            return (
-              <Badge variant="brand" size="sm" className="flex items-center gap-1 font-semibold">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Issue (-)</span>
-              </Badge>
-            );
-          }
+          const type = info.getValue() as string;
+          const isReceipt = type === 'RECEIPT';
           return (
-            <Badge variant="warning" size="sm" className="flex items-center gap-1 font-semibold">
-              <SlidersHorizontal className="w-3 h-3" />
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${isReceipt ? 'bg-[#16845B]/15 text-[#16845B]' : 'bg-[#C78B24]/15 text-[#C78B24]'}`}
+            >
+              {isReceipt ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
               <span>{type}</span>
-            </Badge>
+            </span>
           );
         },
       },
       {
         accessorKey: 'quantity',
-        header: 'Quantity',
+        header: 'Movement Qty',
         cell: (info) => {
+          const isReceipt = info.row.original.transactionType === 'RECEIPT';
           const qty = info.getValue() as number;
-          const isIssue = info.row.original.transactionType === 'ISSUE';
           return (
-            <span className={`font-mono font-bold text-xs ${isIssue ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-              {isIssue ? `-${qty}` : `+${qty}`}
+            <span
+              className={`font-mono font-bold text-xs ${isReceipt ? 'text-[#16845B] dark:text-[#45C79A]' : 'text-[#C78B24] dark:text-[#E7B65A]'}`}
+            >
+              {isReceipt ? `+${qty}` : `-${qty}`}
             </span>
           );
         },
       },
       {
-        accessorKey: 'departmentCode',
-        header: 'Dept / Source',
-        cell: (info) => (
-          <Badge variant="neutral" size="sm" className="font-mono">
-            {(info.getValue() as string) || 'CENTRAL'}
-          </Badge>
-        ),
-      },
-      {
         accessorKey: 'totalCost',
-        header: 'Total Valuation',
+        header: 'Total Value ($)',
         cell: (info) => (
-          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+          <span className="font-mono font-bold text-xs text-brand-text">
             ${(info.getValue() as number).toFixed(2)}
           </span>
         ),
       },
       {
-        accessorKey: 'notes',
-        header: 'Voucher Remarks',
-        cell: (info) => (
-          <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs block">
-            {(info.getValue() as string) || '&mdash;'}
-          </span>
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <RowActions onView={() => setSelectedTx(row.original)} />
         ),
       },
     ],
@@ -163,121 +170,110 @@ export const StoresLedgerScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Inventory', href: '/inventory/items' },
-          { label: 'Stock Ledger' },
-        ]}
-        title="Stores Perpetual Stock Ledger"
-        subtitle="FIFO / Weighted-Average inventory movements, receipts, issues & audit ledgers"
+        title="Central Stores Stock Ledger"
+        badge={<StatusBadge status="ACTIVE" label="Real-Time Inventory" />}
         actions={
           <PageActions>
             <Button
-              onClick={fetchTransactions}
-              variant="secondary"
+              variant="outline"
               size="sm"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Refresh Ledger
+              Export Ledger
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <Boxes className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Transactions
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount} Entries
-            </div>
-          </div>
-        </Card>
+      {/* 2. Stock Ledger KPI Summary */}
+      <LedgerSummary
+        openingBalance={4500}
+        totalDebit={totalReceipts}
+        totalCredit={totalIssues}
+        closingBalance={4500 + (totalReceipts - totalIssues)}
+        currencySymbol="Qty"
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Goods Inward (GRN)
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {receiptCount} Receipts
-            </div>
-          </div>
-        </Card>
+      {/* 3. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: 'All Stock Movements', count: totalCount },
+          { id: 'RECEIPT', label: 'Goods Receipts (Inward)' },
+          { id: 'ISSUE', label: 'Departmental Issues (Outward)' },
+          { id: 'ADJUSTMENT', label: 'Audit Adjustments' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
-            <TrendingDown className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Department Issues
-            </div>
-            <div className="text-lg font-bold text-purple-600 dark:text-purple-400 tracking-tight">
-              {issueCount} Issues
-            </div>
-          </div>
-        </Card>
+      {/* 4. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search tx number, item code, department..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50 shrink-0">
-            <PackageCheck className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Valuation Method
-            </div>
-            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-              Weighted Avg
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Movement Types</option>
-            <option value="RECEIPT">Stock Receipts (+)</option>
-            <option value="ISSUE">Department Issues (-)</option>
-            <option value="AUDIT_ADJUST">Audit Corrections</option>
-            <option value="DAMAGE">Damages &amp; Write-Offs</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Transactions DataTable */}
-      <DataTable<StockTransactionDto>
-        title="Stock Movement Ledger"
-        subtitle="Unchangeable audit log of every stock movement through hotel stores"
+      {/* 5. Data Table */}
+      <DataTable
         data={transactions}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onRefresh={fetchTransactions}
-        exportFileName="stores_ledger.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
+
+      {/* 6. Transaction Detail Drawer */}
+      {selectedTx && (
+        <DetailDrawer
+          isOpen={!!selectedTx}
+          onClose={() => setSelectedTx(null)}
+          title={`Stock Movement #${selectedTx.transactionNumber}`}
+          subtitle={`Item: ${selectedTx.itemName} (${selectedTx.itemCode})`}
+          status={selectedTx.transactionType}
+          width="md"
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Movement Type</span>
+                <span className="font-semibold text-brand-text">{selectedTx.transactionType}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Department</span>
+                <span className="font-mono text-brand-text">{selectedTx.departmentCode}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Quantity</span>
+                <span className="font-mono font-bold text-sm text-brand-text">{selectedTx.quantity} units</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Total Valuation</span>
+                <span className="font-mono font-bold text-sm text-[#16845B] dark:text-[#45C79A]">
+                  ${(selectedTx.totalValue || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {selectedTx.notes && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-0.5">Notes</span>
+                <p className="text-brand-text">{selectedTx.notes}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

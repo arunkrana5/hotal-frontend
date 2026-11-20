@@ -3,7 +3,7 @@ import { api } from '@/services/api';
 import { RoomDto, RoomGridSummaryDto } from '@/types/pms';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
+import { FormDrawer, FormSection } from '@/components/enterprise';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   Bed,
@@ -367,73 +367,50 @@ export const RoomGridScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Room Details & Status Transition Modal */}
+      {/* Room Details & Status Transition Drawer */}
       {selectedRoom && (
-        <Modal
+        <FormDrawer
           isOpen={!!selectedRoom}
           onClose={() => setSelectedRoom(null)}
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleUpdateStatus(selectedRoom.id, newStatus, statusNotes);
+          }}
           title={`Room ${selectedRoom.roomNumber} — Operations`}
           subtitle={`Floor ${selectedRoom.floorNumber} • Type: ${selectedRoom.roomTypeCode} • Base Rate: $${selectedRoom.baseRatePerNight}/night`}
-          icon={<Bed className="w-4 h-4" />}
-          size="md"
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedRoom(null)}
-                disabled={isUpdating}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={isUpdating}
-                isLoading={isUpdating}
-                onClick={() => handleUpdateStatus(selectedRoom.id, newStatus, statusNotes)}
-                leftIcon={<Check className="w-3.5 h-3.5" />}
-              >
-                Apply Status
-              </Button>
-            </>
-          }
+          submitText={isUpdating ? 'Applying...' : 'Apply Status'}
+          isLoading={isUpdating}
+          width="md"
         >
-          <div className="space-y-4 text-xs">
-            <div>
-              <label className="block font-bold uppercase tracking-wider text-[11px] text-slate-700 dark:text-slate-300 mb-1.5">
-                Update Operational Status
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { code: 'CLN', label: 'Clean & Ready' },
-                  { code: 'INS', label: 'Inspected' },
-                  { code: 'DRT', label: 'Dirty / Vacant' },
-                  { code: 'OCC', label: 'Occupied' },
-                  { code: 'MNT', label: 'Maintenance' },
-                  { code: 'OOD', label: 'Out of Order' },
-                ].map((s) => (
-                  <button
-                    key={s.code}
-                    type="button"
-                    onClick={() => setNewStatus(s.code)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all shadow-soft-xs',
-                      newStatus === s.code
-                        ? 'border-indigo-600 bg-indigo-50 dark:bg-navy-800 text-indigo-600 dark:text-indigo-400 font-bold'
-                        : 'border-slate-200 dark:border-navy-700 hover:bg-slate-50 dark:hover:bg-navy-800 text-slate-700 dark:text-slate-300'
-                    )}
-                  >
-                    <span>{s.label}</span>
-                    {newStatus === s.code && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-                  </button>
-                ))}
-              </div>
+          <FormSection title="Update Operational Status" description="Select the next housekeeping or maintenance state">
+            <div className="grid grid-cols-2 gap-2 sm:col-span-2">
+              {[
+                { code: 'CLN', label: 'Clean & Ready' },
+                { code: 'INS', label: 'Inspected' },
+                { code: 'DRT', label: 'Dirty / Vacant' },
+                { code: 'OCC', label: 'Occupied' },
+                { code: 'MNT', label: 'Maintenance' },
+                { code: 'OOD', label: 'Out of Order' },
+              ].map((s) => (
+                <button
+                  key={s.code}
+                  type="button"
+                  onClick={() => setNewStatus(s.code)}
+                  className={cn(
+                    'px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all shadow-soft-xs text-xs',
+                    newStatus === s.code
+                      ? 'border-brand-primary bg-indigo-50 dark:bg-brand-darkSecondary text-brand-primary dark:text-[#8495FF] font-bold'
+                      : 'border-brand-border dark:border-brand-darkBorder hover:bg-slate-50 dark:hover:bg-brand-darkCard text-brand-text'
+                  )}
+                >
+                  <span>{s.label}</span>
+                  {newStatus === s.code && <Check className="w-3.5 h-3.5 text-brand-primary dark:text-[#8495FF]" />}
+                </button>
+              ))}
             </div>
 
-            <div>
-              <label className="block font-bold uppercase tracking-wider text-[11px] text-slate-700 dark:text-slate-300 mb-1">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
                 Housekeeping / Engineering Remarks
               </label>
               <textarea
@@ -441,11 +418,11 @@ export const RoomGridScreen: React.FC = () => {
                 placeholder="e.g. Cleaned by Team A, Linens replaced..."
                 value={statusNotes}
                 onChange={(e) => setStatusNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-navy-700 bg-white dark:bg-navy-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none resize-none"
               />
             </div>
-          </div>
-        </Modal>
+          </FormSection>
+        </FormDrawer>
       )}
     </PageContainer>
   );

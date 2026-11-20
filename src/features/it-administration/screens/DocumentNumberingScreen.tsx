@@ -17,7 +17,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
+import { FormDrawer, FormSection, DetailDrawer, StatusBadge } from '@/components/enterprise';
 
 export interface DocumentConfig {
   id: number;
@@ -319,172 +319,147 @@ export const DocumentNumberingScreen: React.FC = () => {
         </Card>
       </div>
 
-      {/* Edit Configuration Modal */}
+      {/* Edit Sequence Drawer */}
       {selectedConfig && (
-        <Modal
+        <FormDrawer
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          title={`Edit Sequence: ${selectedConfig.documentType}`}
-          subtitle={`Module: ${selectedConfig.module} • ID #${selectedConfig.id}`}
-          icon={<Settings2 className="w-4 h-4" />}
-          size="md"
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="edit-doc-config-form"
-                size="sm"
-                disabled={isSaving}
-                leftIcon={<Save className="w-3.5 h-3.5" />}
-              >
-                {isSaving ? 'Saving...' : 'Save Configuration'}
-              </Button>
-            </>
-          }
+          onSubmit={handleSaveConfig}
+          title={`Configure ${selectedConfig.documentType}`}
+          subtitle={`Module: ${selectedConfig.module} • Sequence Length: ${editSeqLength}`}
+          submitText={isSaving ? 'Saving...' : 'Save Sequence Rules'}
+          isLoading={isSaving}
+          width="md"
         >
-          <form id="edit-doc-config-form" onSubmit={handleSaveConfig} className="space-y-4">
-            {/* Dynamic Real-time Preview Strip */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 text-white shadow-soft-sm border border-slate-800">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
-                  Live Preview
-                </span>
-              </div>
-              <div className="font-mono text-sm font-bold tracking-wide text-emerald-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60">
-                {computeModalPreview()}
-              </div>
+          {/* Dynamic Real-time Preview Strip */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 text-white shadow-soft-sm border border-slate-800">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                Live Preview
+              </span>
+            </div>
+            <div className="font-mono text-sm font-bold tracking-wide text-emerald-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60">
+              {computeModalPreview()}
+            </div>
+          </div>
+
+          <FormSection title="Formatting Rules" description="Prefix, suffix and date stamps">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Prefix *
+              </label>
+              <input
+                type="text"
+                required
+                value={editPrefix}
+                onChange={(e) => setEditPrefix(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+                placeholder="e.g. RES-"
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Prefix *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editPrefix}
-                  onChange={(e) => setEditPrefix(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="e.g. RES-"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Suffix (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={editSuffix}
-                  onChange={(e) => setEditSuffix(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="e.g. HQ"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Date Format
-                </label>
-                <select
-                  value={editDateFormat}
-                  onChange={(e) => setEditDateFormat(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-                >
-                  <option value="yyyyMMdd">yyyyMMdd (e.g. 20261119)</option>
-                  <option value="yyyyMM">yyyyMM (e.g. 202611)</option>
-                  <option value="yyyy">yyyy (e.g. 2026)</option>
-                  <option value="NONE">NONE (Sequential only)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Reset Period
-                </label>
-                <select
-                  value={editResetFrequency}
-                  onChange={(e) => setEditResetFrequency(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-                >
-                  <option value="DAILY">Daily (Midnight)</option>
-                  <option value="MONTHLY">Monthly (1st of Month)</option>
-                  <option value="YEARLY">Yearly (Jan 1st)</option>
-                  <option value="NEVER">Never (Perpetual)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Sequence Digits
-                </label>
-                <input
-                  type="number"
-                  min={2}
-                  max={8}
-                  required
-                  value={editSeqLength}
-                  onChange={(e) => setEditSeqLength(Number(e.target.value))}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Starting Number
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  required
-                  value={editStartingNumber}
-                  onChange={(e) => setEditStartingNumber(Number(e.target.value))}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-700 rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Suffix (Optional)
+              </label>
+              <input
+                type="text"
+                value={editSuffix}
+                onChange={(e) => setEditSuffix(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+                placeholder="e.g. HQ"
+              />
             </div>
-          </form>
-        </Modal>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Date Segment
+              </label>
+              <select
+                value={editDateFormat}
+                onChange={(e) => setEditDateFormat(e.target.value)}
+                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none font-medium"
+              >
+                <option value="yyyyMMdd">yyyyMMdd (e.g. 20261119)</option>
+                <option value="yyyyMM">yyyyMM (e.g. 202611)</option>
+                <option value="yyyy">yyyy (e.g. 2026)</option>
+                <option value="NONE">NONE (Sequential only)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Reset Period
+              </label>
+              <select
+                value={editResetFrequency}
+                onChange={(e) => setEditResetFrequency(e.target.value)}
+                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none font-medium"
+              >
+                <option value="DAILY">Daily (Midnight)</option>
+                <option value="MONTHLY">Monthly (1st of Month)</option>
+                <option value="YEARLY">Yearly (Jan 1st)</option>
+                <option value="NEVER">Never (Perpetual)</option>
+              </select>
+            </div>
+          </FormSection>
+
+          <FormSection title="Counter Digits" description="Zero-padding sequence specifications">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Sequence Digits
+              </label>
+              <input
+                type="number"
+                min={2}
+                max={8}
+                required
+                value={editSeqLength}
+                onChange={(e) => setEditSeqLength(Number(e.target.value))}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Starting Number
+              </label>
+              <input
+                type="number"
+                min={1}
+                required
+                value={editStartingNumber}
+                onChange={(e) => setEditStartingNumber(Number(e.target.value))}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          </FormSection>
+        </FormDrawer>
       )}
 
-      {/* Audit Trail Modal */}
-      <Modal
+      {/* Audit Trail Detail Drawer */}
+      <DetailDrawer
         isOpen={isAuditModalOpen}
         onClose={() => setIsAuditModalOpen(false)}
         title="Document Numbering Audit Trail"
         subtitle="Recent transaction sequence assignment log (Last 50 entries)"
-        icon={<History className="w-4 h-4" />}
-        size="xl"
-        footer={
-          <Button size="sm" variant="outline" onClick={() => setIsAuditModalOpen(false)}>
-            Close
-          </Button>
-        }
+        width="lg"
       >
         {isAuditLoading ? (
           <div className="py-8 text-center text-slate-500">
-            <RefreshCw className="w-5 h-5 mx-auto animate-spin mb-2 text-indigo-600" />
+            <RefreshCw className="w-5 h-5 mx-auto animate-spin mb-2 text-brand-primary" />
             Loading audit logs...
           </div>
         ) : audits.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 text-xs">
+          <div className="py-8 text-center text-brand-muted text-xs">
             No generated document numbers found in audit history yet.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border dark:border-navy-800">
+          <div className="overflow-x-auto rounded-xl border border-brand-border dark:border-brand-darkBorder">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 dark:bg-navy-950 border-b border-border dark:border-navy-800 text-[10px] uppercase font-bold text-slate-500">
+                <tr className="bg-slate-50 dark:bg-brand-darkCard border-b border-brand-border dark:border-brand-darkBorder text-[10px] uppercase font-bold text-brand-muted">
                   <th className="py-2.5 px-3">Type</th>
                   <th className="py-2.5 px-3">Document Number</th>
                   <th className="py-2.5 px-3">Generated By</th>
@@ -492,25 +467,23 @@ export const DocumentNumberingScreen: React.FC = () => {
                   <th className="py-2.5 px-3 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border dark:divide-navy-700/60 font-medium">
+              <tbody className="divide-y divide-brand-border dark:divide-brand-darkBorder font-medium">
                 {audits.map((a) => (
-                  <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-navy-800/40 transition-colors">
-                    <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                  <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-brand-darkCard transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-brand-text">
                       {a.documentType}
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                    <td className="py-2.5 px-3 font-mono font-bold text-brand-primary dark:text-[#8495FF]">
                       {a.documentNumber}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                    <td className="py-2.5 px-3 text-brand-muted">
                       {a.generatedBy}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                    <td className="py-2.5 px-3 text-brand-muted text-[11px]">
                       {new Date(a.generatedAt).toLocaleString()}
                     </td>
                     <td className="py-2.5 px-3 text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50">
-                        {a.status}
-                      </span>
+                      <StatusBadge status={a.status} />
                     </td>
                   </tr>
                 ))}
@@ -518,7 +491,7 @@ export const DocumentNumberingScreen: React.FC = () => {
             </table>
           </div>
         )}
-      </Modal>
+      </DetailDrawer>
     </PageContainer>
   );
 };

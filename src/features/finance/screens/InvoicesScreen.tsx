@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import {
@@ -9,21 +8,28 @@ import {
   RecordInvoicePaymentRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Input, Select, Textarea, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+  FinancialSummary,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
 import { useDocumentNumber } from '@/hooks/useDocumentNumber';
-import { DocumentNumberField } from '@/components/common/DocumentNumberField';
 import {
   Receipt,
   Plus,
   CreditCard,
-  X,
-  CheckCircle2,
-  DollarSign,
-  Clock,
+  Download,
+  AlertCircle,
   Building,
+  Calendar,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const InvoicesScreen: React.FC = () => {
@@ -32,17 +38,21 @@ export const InvoicesScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
 
-  // Modals
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const { documentNumber: invNumber, isLoading: isInvLoading, refetch: refetchInv } = useDocumentNumber('INVOICE');
-  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  // Filters & Tabs
+  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [showPaymentDrawer, setShowPaymentDrawer] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { documentNumber: invNumber, isLoading: isInvLoading, refetch: refetchInv } = useDocumentNumber('INVOICE');
 
-  // Create Form
+  // Create Form State
   const [newInvoice, setNewInvoice] = useState<CreateInvoiceRequest>({
     invoiceType: 'GUEST',
     referenceId: '',
@@ -54,18 +64,20 @@ export const InvoicesScreen: React.FC = () => {
     notes: '',
   });
 
-  // Payment Form
+  // Payment Form State
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('CREDIT_CARD');
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (typeFilter) query.append('invoiceType', typeFilter);
-    if (statusFilter) query.append('status', statusFilter);
+    if (search.trim()) query.append('search', search.trim());
+    if (typeFilter !== 'ALL') query.append('invoiceType', typeFilter);
+    if (activeTab !== 'ALL') query.append('status', activeTab);
 
     const res = await api.get<PagedResult<InvoiceDto>>(`/finance/invoices?${query.toString()}`);
     if (res.success && res.data) {
@@ -73,18 +85,30 @@ export const InvoicesScreen: React.FC = () => {
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, typeFilter, activeTab]);
 
   useEffect(() => {
     fetchInvoices();
-  }, [pageIndex, pageSize, typeFilter, statusFilter]);
+  }, [fetchInvoices]);
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newInvoice.clientOrVendorName.trim()) {
+      setErrorMsg('Client or Vendor name is required.');
+      return;
+    }
+    setErrorMsg(null);
     setSubmitting(true);
-    const res = await api.post<InvoiceDto>('/finance/invoices', newInvoice);
+
+    const payload: CreateInvoiceRequest = {
+      ...newInvoice,
+      referenceId: newInvoice.referenceId || invNumber || undefined,
+    };
+
+    const res = await api.post<InvoiceDto>('/finance/invoices', payload);
     if (res.success) {
-      setShowCreateModal(false);
+      setShowCreateDrawer(false);
+      refetchInv();
       setNewInvoice({
         invoiceType: 'GUEST',
         referenceId: '',
@@ -96,37 +120,35 @@ export const InvoicesScreen: React.FC = () => {
         notes: '',
       });
       fetchInvoices();
+    } else {
+      setErrorMsg(res.message || 'Failed to create invoice.');
     }
     setSubmitting(false);
   };
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInvoice) return;
+    if (!selectedInvoice || paymentAmount <= 0) return;
     setSubmitting(true);
 
     const req: RecordInvoicePaymentRequest = {
-      paymentAmount,
+      paymentAmount: Number(paymentAmount),
       paymentMethod,
     };
 
-    const res = await api.post(`/finance/invoices/${selectedInvoice.id}/payments`, req);
+    const res = await api.post<InvoiceDto>(
+      `/finance/invoices/${selectedInvoice.id}/payments`,
+      req
+    );
     if (res.success) {
-      setShowPaymentModal(false);
+      setShowPaymentDrawer(false);
       setSelectedInvoice(null);
       fetchInvoices();
+    } else {
+      setErrorMsg(res.message || 'Payment recording failed.');
     }
     setSubmitting(false);
   };
-
-  const openPayment = (inv: InvoiceDto) => {
-    setSelectedInvoice(inv);
-    setPaymentAmount(inv.totalAmount - inv.paidAmount);
-    setShowPaymentModal(true);
-  };
-
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + ((inv.totalAmount || 0) - (inv.paidAmount || 0)), 0);
 
   const columns = useMemo<ColumnDef<InvoiceDto>[]>(
     () => [
@@ -134,103 +156,97 @@ export const InvoicesScreen: React.FC = () => {
         accessorKey: 'invoiceNumber',
         header: 'Invoice #',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <div className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
-          </span>
+          </div>
         ),
       },
       {
         accessorKey: 'clientOrVendorName',
-        header: 'Customer / Counterparty',
+        header: 'Billed To (Party)',
         cell: (info) => (
           <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{info.getValue() as string}</div>
-            <div className="text-[11px] text-slate-400 font-mono uppercase">
-              {info.row.original.invoiceType} {info.row.original.referenceId && `(${info.row.original.referenceId})`}
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+              {info.getValue() as string}
+            </div>
+            <div className="text-[11px] text-brand-muted uppercase font-mono">
+              Type: {info.row.original.invoiceType}
             </div>
           </div>
         ),
       },
       {
         accessorKey: 'issueDate',
-        header: 'Issue / Due Date',
-        cell: (info) => {
-          const inv = info.row.original;
-          return (
-            <div className="text-xs">
-              <div className="text-slate-800 dark:text-slate-200">{new Date(inv.issueDate).toLocaleDateString()}</div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                Due: {new Date(inv.dueDate).toLocaleDateString()}
-              </div>
+        header: 'Dates',
+        cell: (info) => (
+          <div className="text-xs space-y-0.5">
+            <div className="text-brand-muted text-[11px]">
+              Issued: <span className="font-mono text-brand-text">{new Date(info.getValue() as string).toLocaleDateString()}</span>
             </div>
-          );
-        },
+            <div className="text-brand-muted text-[11px]">
+              Due: <span className="font-mono text-brand-text">{new Date(info.row.original.dueDate).toLocaleDateString()}</span>
+            </div>
+          </div>
+        ),
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Billed Amount',
+        header: 'Total Billed',
         cell: (info) => (
-          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-            ${(info.getValue() as number).toFixed(2)}
+          <span className="font-mono font-bold text-xs text-brand-text">
+            ${(info.getValue() as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
         ),
       },
       {
         accessorKey: 'paidAmount',
-        header: 'Settled',
+        header: 'Paid Amount',
         cell: (info) => (
-          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
-            ${(info.getValue() as number).toFixed(2)}
+          <span className="font-mono font-bold text-xs text-[#16845B] dark:text-[#45C79A]">
+            ${(info.getValue() as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
         ),
       },
       {
-        id: 'balance',
-        header: 'Balance Due',
+        accessorKey: 'balanceAmount',
+        header: 'Outstanding Balance',
         cell: (info) => {
-          const inv = info.row.original;
-          const bal = inv.totalAmount - inv.paidAmount;
-          return bal > 0 ? (
-            <span className="font-mono font-bold text-danger text-xs">
-              ${bal.toFixed(2)}
+          const bal = info.getValue() as number;
+          return (
+            <span className={`font-mono font-bold text-xs ${bal > 0 ? 'text-[#D44848] dark:text-[#F07878]' : 'text-slate-400'}`}>
+              ${bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
-          ) : (
-            <Badge variant="success" size="sm">Paid in Full</Badge>
           );
         },
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        cell: (info) => {
-          const s = (info.getValue() as string) || '';
-          if (s === 'PAID') return <Badge variant="success">Paid</Badge>;
-          if (s === 'PARTIALLY_PAID') return <Badge variant="warning" dot>Partial</Badge>;
-          if (s === 'OVERDUE') return <Badge variant="danger" dot>Overdue</Badge>;
-          return <Badge variant="brand" dot>{s}</Badge>;
-        },
+        cell: (info) => <StatusBadge status={info.getValue() as string} />,
       },
       {
         id: 'actions',
-        header: 'Settlement',
-        cell: (info) => {
-          const inv = info.row.original;
-          const bal = inv.totalAmount - inv.paidAmount;
-          if (bal > 0) {
-            return (
-              <Button
-                size="xs"
-                variant="success"
-                onClick={() => openPayment(inv)}
-                className="font-semibold text-xs flex items-center gap-1"
-              >
-                <CreditCard className="w-3 h-3" />
-                <span>Receive</span>
-              </Button>
-            );
-          }
-          return <span className="text-xs text-slate-400 font-mono">&mdash;</span>;
-        },
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedInvoice(row.original)}
+            customActions={[
+              ...(row.original.balanceAmount > 0
+                ? [
+                    {
+                      label: 'Record Payment',
+                      icon: <CreditCard className="w-3.5 h-3.5" />,
+                      onClick: () => {
+                        setSelectedInvoice(row.original);
+                        setPaymentAmount(row.original.balanceAmount);
+                        setShowPaymentDrawer(true);
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        ),
       },
     ],
     []
@@ -238,309 +254,290 @@ export const InvoicesScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Finance', href: '/finance/invoices' },
-          { label: 'Invoices' },
-        ]}
-        title="Accounts Receivable & Payable Invoicing"
-        subtitle="Corporate guest invoices, travel agent vouchers, vendor AP matching & aging receivables"
+        title="Invoices & Settlements"
+        badge={<StatusBadge status="ACTIVE" label="Real-Time Ledger" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => setShowCreateModal(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Generate Tax Invoice
+              Export CSV
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Create Invoice
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <Receipt className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Invoices
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount} Invoices
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: 'All Invoices', count: totalCount },
+          { id: 'ISSUED', label: 'Unpaid / Issued' },
+          { id: 'PARTIALLY_PAID', label: 'Partially Paid' },
+          { id: 'PAID', label: 'Fully Settled' },
+          { id: 'OVERDUE', label: 'Overdue' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <DollarSign className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Billed
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight font-mono">
-              ${totalInvoiced.toFixed(2)}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search invoice #, client, vendor..."
+        filters={[
+          {
+            id: 'type',
+            label: 'Invoice Type',
+            value: typeFilter,
+            options: [
+              { label: 'All Types', value: 'ALL' },
+              { label: 'Guest Folio Invoices', value: 'GUEST' },
+              { label: 'Vendor Payables', value: 'VENDOR' },
+              { label: 'Corporate Accounts', value: 'CORPORATE' },
+            ],
+            onChange: setTypeFilter,
+          },
+        ]}
+        onResetFilters={() => {
+          setSearch('');
+          setTypeFilter('ALL');
+        }}
+        isFiltered={search !== '' || typeFilter !== 'ALL'}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-100 dark:border-rose-900/50 shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Receivables Due
-            </div>
-            <div className="text-lg font-bold text-rose-600 dark:text-rose-400 tracking-tight font-mono">
-              ${totalOutstanding.toFixed(2)}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
-            <Building className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Ledger Feed
-            </div>
-            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
-              Synced with AR/AP
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Invoice Types</option>
-            <option value="GUEST">Guest Folio Invoices</option>
-            <option value="CORPORATE">Corporate City Ledger</option>
-            <option value="VENDOR">Vendor AP Invoices</option>
-            <option value="BANQUET">Banquet Contracts</option>
-          </Select>
-        </div>
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Payment Statuses</option>
-            <option value="ISSUED">Issued / Pending</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="PAID">Fully Settled</option>
-            <option value="OVERDUE">Overdue</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Invoices DataTable */}
-      <DataTable<InvoiceDto>
-        title="Official Tax Invoice Ledger"
-        subtitle="AR/AP invoices compliant with international hotel auditing standards"
+      {/* 4. Data Table */}
+      <DataTable
         data={invoices}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onRefresh={fetchInvoices}
-        exportFileName="invoices_ledger.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* Create Invoice Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Draft Official Tax Invoice"
-        subtitle="Generate accounts receivable or accounts payable invoice"
-        icon={<Receipt className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Create Invoice Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCreateInvoice}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowCreateModal(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !newInvoice.clientOrVendorName}
-              isLoading={submitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Issue Invoice
-            </Button>
-          </>
-        }
+        title="Create New Invoice"
+        subtitle="Generate authoritative guest or vendor invoice"
+        submitText={submitting ? 'Generating...' : 'Issue Invoice'}
+        isLoading={submitting}
+        width="lg"
       >
-        <DocumentNumberField
-          value={invNumber}
-          label="Invoice Number"
-          isLoading={isInvLoading}
-          onRefresh={refetchInv}
-          helperText="Auto-assigned sequentially by Billing & Finance Engine"
-        />
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        <FormGrid cols={2}>
+        <FormSection title="Invoice Identification" description="Document number and billing party">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Invoice Classification
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Invoice Number (Read-Only)
             </label>
-            <Select
+            <input
+              type="text"
+              readOnly
+              value={invNumber || 'Generating...'}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-slate-100 dark:bg-brand-darkCard dark:border-brand-darkBorder text-brand-primary dark:text-[#8495FF]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Invoice Category *
+            </label>
+            <select
               value={newInvoice.invoiceType}
               onChange={(e) => setNewInvoice({ ...newInvoice, invoiceType: e.target.value })}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
-              <option value="GUEST">Guest Stay Billing</option>
-              <option value="CORPORATE">Corporate City Ledger</option>
-              <option value="VENDOR">Supplier / Vendor Invoice</option>
-              <option value="BANQUET">Banquet Event Settlement</option>
-            </Select>
+              <option value="GUEST">Guest Billing</option>
+              <option value="VENDOR">Vendor Payable</option>
+              <option value="CORPORATE">Corporate Direct Bill</option>
+            </select>
           </div>
 
-          <Input
-            label="Client / Vendor Name *"
-            required
-            value={newInvoice.clientOrVendorName}
-            onChange={(e) => setNewInvoice({ ...newInvoice, clientOrVendorName: e.target.value })}
-            placeholder="e.g. Vance Luxury Holdings"
-          />
-        </FormGrid>
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Client or Vendor Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Acme Corporation / John Doe"
+              value={newInvoice.clientOrVendorName}
+              onChange={(e) => setNewInvoice({ ...newInvoice, clientOrVendorName: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
 
-        <FormGrid cols={2}>
-          <Input
-            label="Subtotal Amount ($) *"
-            type="number"
-            step="0.01"
-            required
-            value={newInvoice.subTotal}
-            onChange={(e) => setNewInvoice({ ...newInvoice, subTotal: Number(e.target.value) })}
-            className="font-mono"
-          />
-          <Input
-            label="VAT / Tax Amount ($) *"
-            type="number"
-            step="0.01"
-            required
-            value={newInvoice.taxAmount}
-            onChange={(e) => setNewInvoice({ ...newInvoice, taxAmount: Number(e.target.value) })}
-            className="font-mono"
-          />
-        </FormGrid>
-
-        <FormGrid cols={2}>
-          <Input
-            label="Issue Date *"
-            type="date"
-            required
-            value={newInvoice.issueDate}
-            onChange={(e) => setNewInvoice({ ...newInvoice, issueDate: e.target.value })}
-          />
-          <Input
-            label="Due Date *"
-            type="date"
-            required
-            value={newInvoice.dueDate}
-            onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
-          />
-        </FormGrid>
-
-        <div>
-          <Textarea
-            label="Billing Remarks &amp; Terms"
-            rows={2}
-            value={newInvoice.notes}
-            onChange={(e) => setNewInvoice({ ...newInvoice, notes: e.target.value })}
-            placeholder="e.g. Corporate discount applied; payment due by wire transfer..."
-          />
-        </div>
-      </Modal>
-
-      {/* Record Payment Modal */}
-      {selectedInvoice && (
-        <Modal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          title="Record Payment Receipt"
-          subtitle={`Invoice #${selectedInvoice.invoiceNumber} • Balance: $${(selectedInvoice.totalAmount - selectedInvoice.paidAmount).toFixed(2)}`}
-          icon={<CreditCard className="w-4 h-4" />}
-          size="md"
-          onSubmit={handleRecordPayment}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPaymentModal(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={submitting || paymentAmount <= 0}
-                isLoading={submitting}
-                leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-              >
-                Record Payment
-              </Button>
-            </>
-          }
-        >
-          <Input
-            label="Payment Amount ($) *"
-            type="number"
-            step="0.01"
-            min="0.01"
-            required
-            value={paymentAmount}
-            onChange={(e) => setPaymentAmount(Number(e.target.value))}
-            className="font-mono"
-          />
+        <FormSection title="Financial Breakdown" description="Subtotal, tax calculation, and payment terms">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Subtotal ($) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              required
+              value={newInvoice.subTotal}
+              onChange={(e) => setNewInvoice({ ...newInvoice, subTotal: parseFloat(e.target.value) || 0 })}
+              className="w-full h-8 px-2.5 text-xs font-mono font-semibold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Payment Method
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Tax Amount ($) *
             </label>
-            <Select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              <option value="CREDIT_CARD">Credit / Debit Card</option>
-              <option value="BANK_TRANSFER">Direct Wire Transfer</option>
-              <option value="CASH">Cash Deposit</option>
-              <option value="CHEQUE">Bank Cheque</option>
-            </Select>
+            <input
+              type="number"
+              step="0.01"
+              required
+              value={newInvoice.taxAmount}
+              onChange={(e) => setNewInvoice({ ...newInvoice, taxAmount: parseFloat(e.target.value) || 0 })}
+              className="w-full h-8 px-2.5 text-xs font-mono font-semibold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
           </div>
-        </Modal>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Issue Date
+            </label>
+            <input
+              type="date"
+              value={newInvoice.issueDate}
+              onChange={(e) => setNewInvoice({ ...newInvoice, issueDate: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Due Date
+            </label>
+            <input
+              type="date"
+              value={newInvoice.dueDate}
+              onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+
+        {/* Real-Time Financial Summary Preview */}
+        <FinancialSummary
+          subtotal={newInvoice.subTotal}
+          taxesTotal={newInvoice.taxAmount}
+          grandTotal={newInvoice.subTotal + newInvoice.taxAmount}
+          amountPaid={0}
+          balanceDue={newInvoice.subTotal + newInvoice.taxAmount}
+        />
+      </FormDrawer>
+
+      {/* 6. Record Payment Drawer */}
+      {selectedInvoice && showPaymentDrawer && (
+        <FormDrawer
+          isOpen={showPaymentDrawer}
+          onClose={() => setShowPaymentDrawer(false)}
+          onSubmit={handleRecordPayment}
+          title={`Record Payment for ${selectedInvoice.invoiceNumber}`}
+          subtitle={`Total Billed: $${selectedInvoice.totalAmount.toFixed(2)} | Balance Due: $${selectedInvoice.balanceAmount.toFixed(2)}`}
+          submitText={submitting ? 'Recording...' : 'Register Payment'}
+          isLoading={submitting}
+          width="md"
+        >
+          <FormSection title="Settlement Details" description="Select payment method and settled amount">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Payment Amount ($) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                max={selectedInvoice.balanceAmount}
+                required
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-[#16845B] dark:text-[#45C79A] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Payment Method *
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              >
+                <option value="CREDIT_CARD">Credit / Debit Card</option>
+                <option value="BANK_TRANSFER">Direct Bank Transfer</option>
+                <option value="CASH">Cash Drawer</option>
+                <option value="ROOM_FOLIO">Charge to Guest Folio</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Payment Notes / Transaction Reference
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Auth Code: #88219"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          </FormSection>
+        </FormDrawer>
+      )}
+
+      {/* 7. Detail Drawer: Full Invoice View */}
+      {selectedInvoice && !showPaymentDrawer && (
+        <DetailDrawer
+          isOpen={!!selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          title={`Invoice ${selectedInvoice.invoiceNumber}`}
+          subtitle={`Billed to: ${selectedInvoice.clientOrVendorName}`}
+          status={selectedInvoice.status}
+          width="lg"
+        >
+          <FinancialSummary
+            subtotal={selectedInvoice.subTotal}
+            taxesTotal={selectedInvoice.taxAmount}
+            grandTotal={selectedInvoice.totalAmount}
+            amountPaid={selectedInvoice.paidAmount}
+            balanceDue={selectedInvoice.balanceAmount}
+          />
+        </DetailDrawer>
       )}
     </PageContainer>
   );

@@ -6,6 +6,7 @@ import { DynamicDropdown } from '@/components/dynamic-dropdown/DynamicDropdown';
 import { Button } from '@/components/common/Button';
 import { Card, Badge, Alert } from '@/components/common/Card';
 import { Modal } from '@/components/common/Modal';
+import { FormDrawer, FormSection, FinancialSummary } from '@/components/enterprise';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import { Input } from '@/components/common/Input';
 import {
@@ -384,180 +385,145 @@ export const FolioManagementScreen: React.FC = () => {
         </Card>
       )}
 
-      {/* Post Extra Charge Modal */}
+      {/* Post Extra Charge Drawer */}
       {folio && (
-        <Modal
+        <FormDrawer
           isOpen={isChargeModalOpen}
           onClose={() => setIsChargeModalOpen(false)}
-          title="Post Charge to Guest Folio"
-          subtitle={`Folio #${folio.folioNumber} • ${folio.guestName}`}
-          icon={<Plus className="w-4 h-4" />}
-          size="md"
           onSubmit={handlePostCharge}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsChargeModalOpen(false)}
-                disabled={isSubmittingCharge}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isSubmittingCharge || !chargeDesc.trim() || chargePrice <= 0}
-                isLoading={isSubmittingCharge}
-                leftIcon={<Plus className="w-3.5 h-3.5" />}
-              >
-                Post Charge
-              </Button>
-            </>
-          }
+          title="Post Charge to Guest Folio"
+          subtitle={`Folio #${folio.folioNumber} • Guest: ${folio.guestName}`}
+          submitText={isSubmittingCharge ? 'Posting...' : 'Post Charge to Folio'}
+          isLoading={isSubmittingCharge}
+          width="md"
         >
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Posting Department
-            </label>
-            <DynamicDropdown
-              masterCode="DEPARTMENT"
-              value={chargeDept}
-              onChange={(val) => setChargeDept(val)}
-              placeholder="Select posting department..."
-            />
-          </div>
+          <FormSection title="Charge Specification" description="Post department charges directly to the guest ledger">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Posting Department
+              </label>
+              <DynamicDropdown
+                masterCode="DEPARTMENT"
+                value={chargeDept}
+                onChange={(val) => setChargeDept(val)}
+                placeholder="Select posting department..."
+              />
+            </div>
 
-          <div>
-            <Input
-              label="Charge Description *"
-              type="text"
-              required
-              value={chargeDesc}
-              onChange={(e) => setChargeDesc(e.target.value)}
-              placeholder="e.g. In-Room Dining / Laundry Service / Spa"
-            />
-          </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Charge Description *
+              </label>
+              <input
+                type="text"
+                required
+                value={chargeDesc}
+                onChange={(e) => setChargeDesc(e.target.value)}
+                placeholder="e.g. In-Room Dining / Laundry Service / Spa"
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Input
-                label="Unit Price ($) *"
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Unit Price ($) *
+              </label>
+              <input
                 type="number"
                 step="0.01"
                 min="0"
                 required
                 value={chargePrice}
                 onChange={(e) => setChargePrice(Number(e.target.value))}
-                className="font-mono"
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
               />
             </div>
+
             <div>
-              <Input
-                label="Quantity *"
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Quantity *
+              </label>
+              <input
                 type="number"
                 min="1"
                 required
                 value={chargeQty}
                 onChange={(e) => setChargeQty(Number(e.target.value))}
-                className="font-mono"
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
               />
             </div>
-          </div>
+          </FormSection>
 
-          <div className="bg-slate-50 dark:bg-navy-800/60 p-3 rounded-xl border border-border dark:border-navy-700 flex justify-between text-xs">
-            <span className="text-slate-500 dark:text-slate-400">Computed Charge Total:</span>
-            <span className="font-bold text-slate-900 dark:text-white font-mono">
-              ${(chargePrice * chargeQty).toFixed(2)}
-            </span>
-          </div>
-        </Modal>
+          <FinancialSummary
+            subtotal={chargePrice * chargeQty}
+            grandTotal={chargePrice * chargeQty}
+            amountPaid={0}
+            balanceDue={chargePrice * chargeQty}
+          />
+        </FormDrawer>
       )}
 
-      {/* Record Payment Modal */}
+      {/* Record Payment Drawer */}
       {folio && (
-        <Modal
+        <FormDrawer
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
-          title="Record Folio Payment"
-          subtitle={`Folio #${folio.folioNumber} • ${folio.guestName}`}
-          icon={<CreditCard className="w-4 h-4" />}
-          size="md"
           onSubmit={handlePostPayment}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPaymentModalOpen(false)}
-                disabled={isSubmittingPayment}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="success"
-                size="sm"
-                disabled={isSubmittingPayment || paymentAmount <= 0}
-                isLoading={isSubmittingPayment}
-                leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-              >
-                Record Payment
-              </Button>
-            </>
-          }
+          title="Record Folio Payment"
+          subtitle={`Folio #${folio.folioNumber} • Guest: ${folio.guestName}`}
+          submitText={isSubmittingPayment ? 'Processing...' : 'Apply Payment'}
+          isLoading={isSubmittingPayment}
+          width="md"
         >
-          <div>
-            <Input
-              label="Payment Amount ($) *"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(Number(e.target.value))}
-              className="font-mono"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Payment Mode
-            </label>
-            <DynamicDropdown
-              masterCode="PAYMENT_MODE"
-              value={paymentMode}
-              onChange={(val) => setPaymentMode(val)}
-              placeholder="Select payment method..."
-            />
-          </div>
-
-          <div>
-            <Input
-              label="Transaction / Authorization Reference"
-              type="text"
-              value={paymentRef}
-              onChange={(e) => setPaymentRef(e.target.value)}
-              placeholder="e.g. AUTH-98214 / TRX-CC-5829"
-              className="font-mono"
-            />
-          </div>
-
-          <div className="bg-slate-50 dark:bg-navy-800/60 p-3.5 rounded-xl border border-border dark:border-navy-700 space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Current Outstanding Balance:</span>
-              <span className="font-bold font-mono text-danger">${folio.balanceAmount.toFixed(2)}</span>
+          <FormSection title="Payment Details" description="Process payment against current guest ledger folio">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Payment Amount ($) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-[#16845B] dark:text-[#45C79A] focus:outline-none"
+              />
             </div>
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 pt-1.5 border-t border-slate-200 dark:border-navy-700">
-              <span>Balance After Payment:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-                ${Math.max(0, folio.balanceAmount - paymentAmount).toFixed(2)}
-              </span>
+
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Payment Mode
+              </label>
+              <DynamicDropdown
+                masterCode="PAYMENT_MODE"
+                value={paymentMode}
+                onChange={(val) => setPaymentMode(val)}
+                placeholder="Select payment method..."
+              />
             </div>
-          </div>
-        </Modal>
+
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Transaction / Authorization Reference
+              </label>
+              <input
+                type="text"
+                value={paymentRef}
+                onChange={(e) => setPaymentRef(e.target.value)}
+                placeholder="e.g. AUTH-98214 / TRX-CC-5829"
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          </FormSection>
+
+          <FinancialSummary
+            subtotal={folio.totalCharges}
+            grandTotal={folio.totalCharges}
+            amountPaid={folio.totalPayments + paymentAmount}
+            balanceDue={Math.max(0, folio.balanceAmount - paymentAmount)}
+          />
+        </FormDrawer>
       )}
     </PageContainer>
   );

@@ -1,38 +1,52 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { GuestDto, CreateGuestRequest } from '@/types/pms';
 import { PagedResult } from '@/types/common';
 import { DataTable } from '@/components/data-table/DataTable';
 import { Button } from '@/components/common/Button';
-import { Card, Badge, Alert } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
-import { Input, Select, Textarea, FormGrid } from '@/components/common/Input';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+} from '@/components/enterprise';
 import {
   Users,
   UserPlus,
   Crown,
-  X,
   Phone,
   Mail,
-  ShieldCheck,
   Globe,
   Sparkles,
-  CheckCircle2,
+  Download,
+  AlertCircle,
+  FileText,
+  CalendarCheck,
 } from 'lucide-react';
 
 export const GuestDirectoryScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [guests, setGuests] = useState<GuestDto[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [vipFilter, setVipFilter] = useState('');
+  const [vipTab, setVipTab] = useState('ALL');
   const [isLoading, setIsLoading] = useState(false);
 
-  // New Guest Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
+  const [selectedGuest, setSelectedGuest] = useState<GuestDto | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // New Guest Form State
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -44,9 +58,6 @@ export const GuestDirectoryScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
   const [specialPreferences, setSpecialPreferences] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchGuests = useCallback(async () => {
     setIsLoading(true);
@@ -56,7 +67,7 @@ export const GuestDirectoryScreen: React.FC = () => {
         pageSize: pageSize.toString(),
       });
       if (search.trim()) params.append('search', search.trim());
-      if (vipFilter.trim()) params.append('vipStatus', vipFilter.trim());
+      if (vipTab !== 'ALL') params.append('vipStatus', vipTab);
 
       const res = await api.request<PagedResult<GuestDto>>(`/pms/guests?${params.toString()}`);
       if (res.success && res.data) {
@@ -66,7 +77,7 @@ export const GuestDirectoryScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pageIndex, pageSize, search, vipFilter]);
+  }, [pageIndex, pageSize, search, vipTab]);
 
   useEffect(() => {
     fetchGuests();
@@ -75,12 +86,12 @@ export const GuestDirectoryScreen: React.FC = () => {
   const handleCreateGuest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim()) {
-      setError('First name, last name, email, and phone are required.');
+      setErrorMsg('First name, last name, email, and phone number are mandatory.');
       return;
     }
 
     setIsSaving(true);
-    setError(null);
+    setErrorMsg(null);
     try {
       const payload: CreateGuestRequest = {
         firstName: firstName.trim(),
@@ -102,7 +113,7 @@ export const GuestDirectoryScreen: React.FC = () => {
       });
 
       if (res.success) {
-        setIsModalOpen(false);
+        setShowCreateDrawer(false);
         setFirstName('');
         setLastName('');
         setEmail('');
@@ -112,11 +123,9 @@ export const GuestDirectoryScreen: React.FC = () => {
         setCity('');
         setCountry('');
         setSpecialPreferences('');
-        setSuccessMessage('Guest profile registered successfully in CRM.');
-        setTimeout(() => setSuccessMessage(null), 5000);
         fetchGuests();
       } else {
-        setError(res.message || 'Failed to register guest profile.');
+        setErrorMsg(res.message || 'Failed to register guest profile.');
       }
     } finally {
       setIsSaving(false);
@@ -128,406 +137,379 @@ export const GuestDirectoryScreen: React.FC = () => {
       case 'Platinum':
       case 'VIP':
         return (
-          <Badge variant="purple" size="sm" className="font-bold flex items-center gap-1">
-            <Crown className="w-3 h-3 text-purple-400" />
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
+            <Crown className="w-2.5 h-2.5 text-purple-400" />
             <span>{vip}</span>
-          </Badge>
+          </span>
         );
       case 'Gold':
         return (
-          <Badge variant="warning" size="sm" className="font-bold flex items-center gap-1">
-            <Crown className="w-3 h-3 text-amber-500" />
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+            <Crown className="w-2.5 h-2.5 text-amber-500" />
             <span>Gold</span>
-          </Badge>
+          </span>
         );
       case 'Silver':
         return (
-          <Badge variant="brand" size="sm" className="font-bold">
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600">
             Silver
-          </Badge>
+          </span>
         );
       default:
-        return <Badge variant="neutral" size="sm">Standard</Badge>;
+        return <StatusBadge status="STANDARD" label="Standard" />;
     }
   };
 
-  const vipTotal = guests.filter(g => g.vipStatus && g.vipStatus !== 'Standard').length;
-
-  const columns: ColumnDef<GuestDto>[] = [
-    {
-      accessorKey: 'fullName',
-      header: 'Guest Name',
-      cell: ({ row }) => (
-        <div className="py-0.5">
-          <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>{row.original.fullName}</span>
-            {getVipBadge(row.original.vipStatus)}
+  const columns: ColumnDef<GuestDto>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'fullName',
+        header: 'Guest Profile',
+        cell: ({ row }) => (
+          <div className="py-0.5">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-xs">
+              <span>{row.original.fullName}</span>
+              {getVipBadge(row.original.vipStatus)}
+            </div>
+            <div className="text-[11px] text-brand-muted font-mono mt-0.5">
+              Guest ID #{row.original.id}
+            </div>
           </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-            Guest ID #{row.original.id}
+        ),
+      },
+      {
+        accessorKey: 'email',
+        header: 'Contact Details',
+        cell: ({ row }) => (
+          <div className="text-xs space-y-0.5">
+            <div className="text-brand-text flex items-center gap-1.5">
+              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+              <span>{row.original.email}</span>
+            </div>
+            <div className="text-brand-muted font-mono flex items-center gap-1.5 text-[11px]">
+              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+              <span>{row.original.phone}</span>
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'email',
-      header: 'Contact Details',
-      cell: ({ row }) => (
-        <div className="text-xs space-y-0.5">
-          <div className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>{row.original.email}</span>
+        ),
+      },
+      {
+        accessorKey: 'nationality',
+        header: 'Nationality & Origin',
+        cell: ({ row }) => (
+          <div className="text-xs flex items-center gap-1.5 text-brand-text">
+            <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>
+              {row.original.nationality || 'Unspecified'}
+              {row.original.city && `, ${row.original.city}`}
+            </span>
           </div>
-          <div className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 text-[11px]">
-            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>{row.original.phone}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'nationality',
-      header: 'Nationality / Origin',
-      cell: ({ row }) => (
-        <div className="text-xs flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-          <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>
-            {row.original.nationality || 'Unspecified'}
-            {row.original.city && `, ${row.original.city}`}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'idDocumentNumber',
-      header: 'Identity Document',
-      cell: ({ row }) =>
-        row.original.idDocumentNumber ? (
+        ),
+      },
+      {
+        accessorKey: 'idDocumentNumber',
+        header: 'Identification',
+        cell: ({ row }) => (
           <div className="text-xs font-mono">
-            <span className="text-slate-500 dark:text-slate-400 text-[10px] uppercase block">
-              {row.original.idDocumentType}
-            </span>
-            <span className="font-semibold text-slate-800 dark:text-slate-200">
-              {row.original.idDocumentNumber}
-            </span>
+            {row.original.idDocumentNumber ? (
+              <span className="text-brand-text">
+                {row.original.idDocumentType}: {row.original.idDocumentNumber}
+              </span>
+            ) : (
+              <span className="text-brand-muted italic">Not recorded</span>
+            )}
           </div>
-        ) : (
-          <span className="text-slate-400 text-xs italic">Pending verification</span>
         ),
-    },
-    {
-      accessorKey: 'totalStays',
-      header: 'Lifetime Stays',
-      cell: ({ row }) => (
-        <Badge variant="neutral" size="sm" className="font-mono font-bold">
-          {row.original.totalStays} Stays
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'lifetimeSpend',
-      header: 'Total Spent',
-      cell: ({ row }) => (
-        <span className="font-semibold text-slate-900 dark:text-white font-mono text-xs">
-          ${Number(row.original.lifetimeSpend || 0).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'specialPreferences',
-      header: 'Guest Preferences',
-      cell: ({ row }) =>
-        row.original.specialPreferences ? (
-          <span className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-[200px] block" title={row.original.specialPreferences}>
-            {row.original.specialPreferences}
-          </span>
-        ) : (
-          <span className="text-slate-400 text-xs">&mdash;</span>
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedGuest(row.original)}
+            customActions={[
+              {
+                label: 'Create Booking',
+                icon: <CalendarCheck className="w-3.5 h-3.5 text-brand-primary" />,
+                onClick: () => navigate('/reservations/new'),
+              },
+            ]}
+          />
         ),
-    },
-  ];
+      },
+    ],
+    [navigate]
+  );
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Guests', href: '/guests' },
-          { label: 'Guest Directory' },
-        ]}
-        title="Guest Directory &amp; CRM"
-        subtitle="Guest profiles, loyalty tiers, identity documents, and lifetime spend history"
-        icon={<Users className="w-4 h-4" />}
-        badge={<Badge variant="info">CRM</Badge>}
+        title="Guest Profiles & CRM"
+        badge={<StatusBadge status="ACTIVE" label="Guest Directory" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => {
-                setError(null);
-                setIsModalOpen(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              icon={<UserPlus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Add Guest Profile
+              Export Directory
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs"
+              leftIcon={<UserPlus className="w-3.5 h-3.5" />}
+            >
+              Register Guest
             </Button>
           </PageActions>
         }
       />
 
-      {successMessage && (
-        <Alert
-          type="success"
-          title="Guest Registered"
-          message={successMessage}
-          onClose={() => setSuccessMessage(null)}
-        />
-      )}
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={vipTab}
+        onChange={setVipTab}
+        tabs={[
+          { id: 'ALL', label: 'All Guest Profiles', count: totalCount },
+          { id: 'VIP', label: 'VIP & Loyalty' },
+          { id: 'Standard', label: 'Standard Guests' },
+        ]}
+      />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Guest Profiles
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search guest by name, email, phone, passport..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50">
-            <Crown className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              VIP Tier Patrons
-            </div>
-            <div className="text-xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">
-              {vipTotal}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Identity Verification
-            </div>
-            <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
-              KYC &amp; Passport Encrypted
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Concierge CRM
-            </div>
-            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1">
-              Cross-Property History
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-64">
-          <Select
-            value={vipFilter}
-            onChange={(e) => {
-              setVipFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Loyalty &amp; VIP Tiers</option>
-            <option value="Standard">Standard Tier</option>
-            <option value="Silver">Silver Tier</option>
-            <option value="Gold">Gold Tier</option>
-            <option value="Platinum">Platinum Tier</option>
-            <option value="VIP">VIP Executive</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Guest DataTable */}
-      <DataTable<GuestDto>
-        title="Guest Profiles Directory"
-        subtitle="Comprehensive guest master records synced across PMS booking engine and billing"
+      {/* 4. Data Table */}
+      <DataTable
         data={guests}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={isLoading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onSearchChange={(t) => {
-          setSearch(t);
-          setPageIndex(0);
-        }}
-        onRefresh={fetchGuests}
-        searchPlaceholder="Search guest by name, email, or phone..."
-        exportFileName="guest_crm_directory.csv"
+        isLoading={isLoading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* New Guest Profile Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Register New Guest Profile"
-        subtitle="Add guest details, contact numbers, nationality, and VIP classification"
-        icon={<UserPlus className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Register Guest Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCreateGuest}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsModalOpen(false)}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSaving}
-              isLoading={isSaving}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Save Guest Profile
-            </Button>
-          </>
-        }
+        title="Register New Guest Profile"
+        subtitle="Create authoritative CRM profile for future stays and preferences"
+        submitText={isSaving ? 'Registering...' : 'Save Profile'}
+        isLoading={isSaving}
+        width="lg"
       >
-        {error && (
-          <Alert type="error" message={error} />
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
         )}
 
-        <FormGrid cols={2}>
-          <Input
-            label="First Name *"
-            required
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="e.g. Eleanor"
-          />
-          <Input
-            label="Last Name *"
-            required
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="e.g. Vance"
-          />
-        </FormGrid>
-
-        <FormGrid cols={2}>
-          <Input
-            label="Email Address *"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="eleanor.vance@luxury.com"
-          />
-          <Input
-            label="Phone / Mobile *"
-            type="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+1 (555) 901-2345"
-          />
-        </FormGrid>
-
-        <FormGrid cols={3}>
+        <FormSection title="Personal Information" description="Legal name and VIP classification">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Loyalty / VIP Tier
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              First Name *
             </label>
-            <Select
-              value={vipStatus}
-              onChange={(e) => setVipStatus(e.target.value)}
-            >
-              <option value="Standard">Standard</option>
-              <option value="Silver">Silver</option>
-              <option value="Gold">Gold</option>
-              <option value="Platinum">Platinum</option>
-              <option value="VIP">VIP Executive</option>
-            </Select>
+            <input
+              type="text"
+              required
+              placeholder="e.g. John"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Last Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Doe"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              VIP Tier Status
+            </label>
+            <select
+              value={vipStatus}
+              onChange={(e) => setVipStatus(e.target.value)}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            >
+              <option value="Standard">Standard Guest</option>
+              <option value="Silver">Silver Tier</option>
+              <option value="Gold">Gold Tier VIP</option>
+              <option value="Platinum">Platinum / Diamond VIP</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Nationality
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. United States"
+              value={nationality}
+              onChange={(e) => setNationality(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Contact & Identification" description="Email, phone, and government document">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              placeholder="john.doe@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              required
+              placeholder="+1 (555) 019-2834"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               ID Document Type
             </label>
-            <Select
+            <select
               value={idDocType}
               onChange={(e) => setIdDocType(e.target.value)}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
               <option value="Passport">Passport</option>
               <option value="NationalID">National ID / Aadhaar</option>
-              <option value="DriversLicense">Driver's License</option>
-            </Select>
+              <option value="DrivingLicense">Driving License</option>
+            </select>
           </div>
 
-          <Input
-            label="ID Document #"
-            value={idDocNumber}
-            onChange={(e) => setIdDocNumber(e.target.value)}
-            placeholder="e.g. A9283741"
-            className="font-mono"
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Document Number
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. A12345678"
+              value={idDocNumber}
+              onChange={(e) => setIdDocNumber(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-        <FormGrid cols={3}>
-          <Input
-            label="Nationality"
-            value={nationality}
-            onChange={(e) => setNationality(e.target.value)}
-            placeholder="e.g. Canada"
-          />
-          <Input
-            label="City"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="e.g. Vancouver"
-          />
-          <Input
-            label="Country"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            placeholder="e.g. Canada"
-          />
-        </FormGrid>
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Special Preferences &amp; Dietary Requirements
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. High floor, feather-free pillows, allergic to peanuts"
+              value={specialPreferences}
+              onChange={(e) => setSpecialPreferences(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+      </FormDrawer>
 
-        <div>
-          <Textarea
-            label="Special Preferences / Dietary / Room Habits"
-            rows={2}
-            value={specialPreferences}
-            onChange={(e) => setSpecialPreferences(e.target.value)}
-            placeholder="e.g. Feather pillow allergy, prefers sparkling water, high floor..."
-          />
-        </div>
-      </Modal>
+      {/* 6. Guest Detail Drawer */}
+      {selectedGuest && (
+        <DetailDrawer
+          isOpen={!!selectedGuest}
+          onClose={() => setSelectedGuest(null)}
+          title={selectedGuest.fullName}
+          subtitle={`CRM Profile #${selectedGuest.id}`}
+          status={selectedGuest.vipStatus || 'Standard'}
+          width="lg"
+          actions={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/reservations/new')}
+              leftIcon={<CalendarCheck className="w-3.5 h-3.5" />}
+              className="text-xs"
+            >
+              Create Booking for Guest
+            </Button>
+          }
+        >
+          <div className="space-y-4 text-xs">
+            {/* Contact details */}
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Email</span>
+                <span className="font-semibold text-brand-text">{selectedGuest.email}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Phone</span>
+                <span className="font-mono font-semibold text-brand-text">{selectedGuest.phone}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Nationality</span>
+                <span className="text-brand-text">{selectedGuest.nationality || 'Unspecified'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">ID Document</span>
+                <span className="font-mono text-brand-text">
+                  {selectedGuest.idDocumentType}: {selectedGuest.idDocumentNumber || 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* Special preferences */}
+            {selectedGuest.specialPreferences && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-1">
+                  Guest Preferences &amp; Notes
+                </span>
+                <p className="text-xs text-brand-text leading-relaxed">{selectedGuest.specialPreferences}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

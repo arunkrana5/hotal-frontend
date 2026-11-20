@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import {
@@ -10,22 +9,28 @@ import {
   VendorDto,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Input, Select, Textarea, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+  FinancialSummary,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
 import { useDocumentNumber } from '@/hooks/useDocumentNumber';
-import { DocumentNumberField } from '@/components/common/DocumentNumberField';
 import {
   ShoppingBag,
   Plus,
-  RefreshCw,
-  Truck,
   Trash2,
-  X,
-  CheckCircle2,
-  DollarSign,
-  Package,
+  Printer,
+  Truck,
+  Download,
+  AlertCircle,
+  Building,
 } from 'lucide-react';
 
 export const PurchaseOrdersScreen: React.FC = () => {
@@ -34,10 +39,15 @@ export const PurchaseOrdersScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
-  const [statusFilter, setStatusFilter] = useState<string>('');
 
-  // Modal State
-  const [showModal, setShowModal] = useState<boolean>(false);
+  // Filters & Tabs
+  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+  const [vendorFilter, setVendorFilter] = useState<string>('ALL');
+
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderDto | null>(null);
   const { documentNumber: poNumber, isLoading: isPoLoading, refetch: refetchPo } = useDocumentNumber('PURCHASE_ORDER');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [vendors, setVendors] = useState<VendorDto[]>([]);
@@ -49,16 +59,19 @@ export const PurchaseOrdersScreen: React.FC = () => {
   const [paymentTerms, setPaymentTerms] = useState<string>('Net 30 Days');
   const [notes, setNotes] = useState<string>('');
   const [items, setItems] = useState<CreatePurchaseOrderItemRequest[]>([
-    { itemName: '', quantityOrdered: 10, unit: 'PCS', unitPrice: 20 },
+    { itemName: 'Bedding Sets (300 Thread Count)', quantityOrdered: 20, unit: 'SET', unitPrice: 45 },
   ]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (statusFilter) query.append('status', statusFilter);
+    if (search.trim()) query.append('search', search.trim());
+    if (activeTab !== 'ALL') query.append('status', activeTab);
+    if (vendorFilter !== 'ALL') query.append('vendorId', vendorFilter);
 
     const res = await api.get<PagedResult<PurchaseOrderDto>>(`/purchase/orders?${query.toString()}`);
     if (res.success && res.data) {
@@ -66,7 +79,7 @@ export const PurchaseOrdersScreen: React.FC = () => {
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, activeTab, vendorFilter]);
 
   const fetchVendors = async () => {
     const res = await api.get<PagedResult<VendorDto>>('/purchase/vendors?pageSize=50');
@@ -81,40 +94,38 @@ export const PurchaseOrdersScreen: React.FC = () => {
   useEffect(() => {
     fetchOrders();
     fetchVendors();
-  }, [pageIndex, pageSize, statusFilter]);
+  }, [fetchOrders]);
 
   const handleAddItem = () => {
-    setItems([...items, { itemName: '', quantityOrdered: 5, unit: 'PCS', unitPrice: 15 }]);
+    setItems([
+      ...items,
+      { itemName: '', quantityOrdered: 10, unit: 'PCS', unitPrice: 15 },
+    ]);
   };
 
-  const handleRemoveItem = (index: number) => {
+  const handleRemoveItem = (idx: number) => {
     if (items.length <= 1) return;
-    setItems(items.filter((_, i) => i !== index));
+    setItems(items.filter((_, i) => i !== idx));
   };
 
-  const handleItemChange = (
-    index: number,
-    field: keyof CreatePurchaseOrderItemRequest,
-    val: any
-  ) => {
+  const handleItemChange = (idx: number, field: keyof CreatePurchaseOrderItemRequest, val: any) => {
     const updated = [...items];
-    updated[index] = { ...updated[index], [field]: val };
+    updated[idx] = { ...updated[idx], [field]: val };
     setItems(updated);
   };
 
-  const calculatedSubtotal = useMemo(() => {
-    return items.reduce(
-      (sum, item) => sum + (Number(item.quantityOrdered) || 0) * (Number(item.unitPrice) || 0),
-      0
-    );
-  }, [items]);
+  const totalPoAmount = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantityOrdered * item.unitPrice, 0),
+    [items]
+  );
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vendorId) return;
 
     setSubmitting(true);
-    const req: CreatePurchaseOrderRequest = {
+    setErrorMsg(null);
+    const payload: CreatePurchaseOrderRequest = {
       vendorId: Number(vendorId),
       orderDate,
       expectedDeliveryDate,
@@ -122,109 +133,82 @@ export const PurchaseOrdersScreen: React.FC = () => {
       notes,
       items,
     };
-    const res = await api.post<PurchaseOrderDto>('/purchase/orders', req);
+
+    const res = await api.post<PurchaseOrderDto>('/purchase/orders', payload);
     if (res.success) {
-      setShowModal(false);
-      setNotes('');
-      setItems([{ itemName: '', quantityOrdered: 10, unit: 'PCS', unitPrice: 20 }]);
+      setShowCreateDrawer(false);
+      refetchPo();
       fetchOrders();
+    } else {
+      setErrorMsg(res.message || 'Failed to create purchase order.');
     }
     setSubmitting(false);
   };
 
-  const handleStatusUpdate = async (id: number, status: string) => {
-    await api.put(`/purchase/orders/${id}/status`, { status });
-    fetchOrders();
-  };
-
-  const totalPoValue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
-  const columns = useMemo<ColumnDef<PurchaseOrderDto>[]>(
+  const columns: ColumnDef<PurchaseOrderDto>[] = useMemo(
     () => [
       {
         accessorKey: 'orderNumber',
-        header: 'PO Number',
+        header: 'PO #',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <div className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
-          </span>
+          </div>
         ),
       },
       {
         accessorKey: 'vendorName',
-        header: 'Vendor / Supplier',
+        header: 'Supplier / Vendor',
         cell: (info) => (
-          <span className="font-semibold text-slate-900 dark:text-white text-xs">
-            {info.getValue() as string}
-          </span>
+          <div>
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+              {info.getValue() as string}
+            </div>
+            <div className="text-[11px] text-brand-muted font-mono">
+              Terms: {info.row.original.paymentTerms || 'Net 30'}
+            </div>
+          </div>
         ),
       },
       {
-        accessorKey: 'items',
-        header: 'Items Detail',
-        cell: (info) => {
-          const list = (info.getValue() as any[]) || [];
-          return (
-            <div className="text-xs">
-              <span className="font-semibold text-slate-800 dark:text-slate-200">{list.length} Item(s)</span>
-              {list[0] && (
-                <span className="text-slate-500 dark:text-slate-400 block truncate max-w-xs text-[11px]">
-                  {list[0].itemName} ({list[0].quantityOrdered} {list[0].unit})
-                </span>
-              )}
+        accessorKey: 'orderDate',
+        header: 'Order Schedule',
+        cell: (info) => (
+          <div className="text-xs space-y-0.5 font-mono">
+            <div className="text-brand-text">
+              Date: {new Date(info.getValue() as string).toLocaleDateString()}
             </div>
-          );
-        },
+            {info.row.original.expectedDeliveryDate && (
+              <div className="text-brand-muted text-[11px]">
+                Exp: {new Date(info.row.original.expectedDeliveryDate).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        ),
       },
       {
         accessorKey: 'totalAmount',
         header: 'Total Order Value',
         cell: (info) => (
-          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+          <span className="font-mono font-bold text-xs text-brand-text">
             ${(info.getValue() as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-        ),
-      },
-      {
-        accessorKey: 'expectedDeliveryDate',
-        header: 'Expected Delivery',
-        cell: (info) => (
-          <span className="text-xs text-slate-600 dark:text-slate-300 font-mono">
-            {new Date(info.getValue() as string).toLocaleDateString()}
           </span>
         ),
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        cell: (info) => {
-          const s = (info.getValue() as string) || '';
-          if (s === 'ISSUED') return <Badge variant="brand" dot>Issued to Supplier</Badge>;
-          if (s === 'RECEIVED' || s === 'COMPLETED') return <Badge variant="success">Goods Received</Badge>;
-          if (s === 'CANCELLED') return <Badge variant="danger">Cancelled</Badge>;
-          return <Badge variant="neutral">{s}</Badge>;
-        },
+        cell: (info) => <StatusBadge status={info.getValue() as string} />,
       },
       {
         id: 'actions',
-        header: 'Action',
-        cell: (info) => {
-          const po = info.row.original;
-          if (po.status === 'ISSUED' || po.status === 'DRAFT') {
-            return (
-              <Button
-                size="xs"
-                variant="success"
-                onClick={() => handleStatusUpdate(po.id, 'RECEIVED')}
-                className="font-semibold text-xs flex items-center gap-1"
-              >
-                <Truck className="w-3 h-3" />
-                <span>Receive GRN</span>
-              </Button>
-            );
-          }
-          return <span className="text-xs text-slate-400 font-mono">&mdash;</span>;
-        },
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedOrder(row.original)}
+            onPrint={() => {}}
+          />
+        ),
       },
     ],
     []
@@ -232,274 +216,269 @@ export const PurchaseOrdersScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Procurement', href: '/purchase/requisitions' },
-          { label: 'Purchase Orders' },
-        ]}
-        title="Purchase Orders & Goods Receipts"
-        subtitle="Vendor PO generation, payment terms, Goods Receipt Notes (GRN) & three-way match"
+        title="Purchase Orders"
+        badge={<StatusBadge status="ACTIVE" label="Procurement Hub" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => setShowModal(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Generate Purchase Order
+              Export
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Issue Purchase Order
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <ShoppingBag className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Purchase Orders
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount} Orders
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: 'All Purchase Orders', count: totalCount },
+          { id: 'ISSUED', label: 'Issued / Open' },
+          { id: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
+          { id: 'COMPLETED', label: 'Fulfilled' },
+          { id: 'CANCELLED', label: 'Cancelled' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <DollarSign className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Committed Spend
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight font-mono">
-              ${totalPoValue.toFixed(2)}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search PO #, supplier name..."
+        filters={[
+          {
+            id: 'vendor',
+            label: 'Vendor',
+            value: vendorFilter,
+            options: [
+              { label: 'All Suppliers', value: 'ALL' },
+              ...vendors.map((v) => ({ label: v.vendorName, value: v.id.toString() })),
+            ],
+            onChange: setVendorFilter,
+            width: 'w-48',
+          },
+        ]}
+        onResetFilters={() => {
+          setSearch('');
+          setVendorFilter('ALL');
+        }}
+        isFiltered={search !== '' || vendorFilter !== 'ALL'}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
-            <Truck className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Active Suppliers
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {vendors.length} Vendors
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50 shrink-0">
-            <Package className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Pending Deliveries
-            </div>
-            <div className="text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tight">
-              {orders.filter((o) => o.status === 'ISSUED').length} In Transit
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All PO Statuses</option>
-            <option value="ISSUED">Issued to Supplier</option>
-            <option value="RECEIVED">Goods Received</option>
-            <option value="CANCELLED">Cancelled</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Orders DataTable */}
-      <DataTable<PurchaseOrderDto>
-        title="Purchase Orders Registry"
-        subtitle="Approved supplier contracts awaiting logistics receipt and stores induction"
+      {/* 4. Data Table */}
+      <DataTable
         data={orders}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onRefresh={fetchOrders}
-        exportFileName="purchase_orders.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* New Purchase Order Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Generate Supplier Purchase Order"
-        subtitle="Direct contract binding hotel procurement with approved external vendor"
-        icon={<ShoppingBag className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Create PO Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCreateOrder}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowModal(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !vendorId}
-              isLoading={submitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Issue Purchase Order
-            </Button>
-          </>
-        }
+        title="Issue Purchase Order"
+        subtitle="Generate binding vendor procurement order with itemized lines"
+        submitText={submitting ? 'Generating...' : 'Issue Order'}
+        isLoading={submitting}
+        width="xl"
       >
-        <DocumentNumberField
-          value={poNumber}
-          label="Purchase Order Number"
-          isLoading={isPoLoading}
-          onRefresh={refetchPo}
-          helperText="Auto-assigned sequentially by Purchase Engine"
-        />
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        <FormGrid cols={2}>
+        <FormSection title="Supplier & Order Details" description="Select vendor and payment terms">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Select Vendor *
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              PO Number (Read-Only)
             </label>
-            <Select
+            <input
+              type="text"
+              readOnly
+              value={poNumber || 'Generating...'}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-slate-100 dark:bg-brand-darkCard dark:border-brand-darkBorder text-brand-primary dark:text-[#8495FF]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Approved Supplier *
+            </label>
+            <select
               value={vendorId}
               onChange={(e) => setVendorId(Number(e.target.value))}
               required
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             >
-              <option value="">Select vendor...</option>
               {vendors.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.vendorName} ({v.vendorCode} &bull; Net {v.paymentTermsDays}d)
+                  {v.vendorName} ({v.vendorCode})
                 </option>
               ))}
-            </Select>
+            </select>
           </div>
 
-          <Input
-            label="Expected Delivery Date *"
-            type="date"
-            required
-            value={expectedDeliveryDate}
-            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Order Date
+            </label>
+            <input
+              type="date"
+              value={orderDate}
+              onChange={(e) => setOrderDate(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-        <FormGrid cols={2}>
-          <Input
-            label="Payment Terms"
-            value={paymentTerms}
-            onChange={(e) => setPaymentTerms(e.target.value)}
-            placeholder="e.g. Net 30 Days"
-          />
-          <Input
-            label="Order Notes / Delivery Dock Instructions"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Deliver to Service Bay #2 before 10 AM"
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Expected Delivery
+            </label>
+            <input
+              type="date"
+              value={expectedDeliveryDate}
+              onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
 
-        {/* Items Section */}
-        <div className="space-y-3 pt-2 border-t border-border dark:border-navy-800">
+        {/* PO Line Items */}
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-900 dark:text-white">PO Item Specifications</span>
-            <Button type="button" size="xs" variant="outline" onClick={handleAddItem} leftIcon={<Plus className="w-3 h-3" />}>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+              Procurement Items
+            </h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={handleAddItem}
+              className="text-[11px]"
+              leftIcon={<Plus className="w-3 h-3" />}
+            >
               Add Item
             </Button>
           </div>
 
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-            {items.map((it, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-navy-800/60 p-2.5 rounded-xl border border-border dark:border-navy-700">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Item name / SKU..."
-                    value={it.itemName}
+          <div className="space-y-2">
+            {items.map((item, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface grid grid-cols-12 gap-2 items-center text-xs"
+              >
+                <div className="col-span-5">
+                  <input
+                    type="text"
                     required
+                    placeholder="Item / Specification"
+                    value={item.itemName}
                     onChange={(e) => handleItemChange(idx, 'itemName', e.target.value)}
-                    className="h-8 text-xs"
+                    className="w-full h-7 px-2 text-xs rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                <div className="w-20">
-                  <Input
+
+                <div className="col-span-2">
+                  <input
                     type="number"
                     min="1"
                     placeholder="Qty"
-                    value={it.quantityOrdered}
-                    onChange={(e) => handleItemChange(idx, 'quantityOrdered', Number(e.target.value))}
-                    className="h-8 text-xs font-mono"
+                    value={item.quantityOrdered}
+                    onChange={(e) => handleItemChange(idx, 'quantityOrdered', parseInt(e.target.value) || 1)}
+                    className="w-full h-7 px-1.5 text-xs text-center font-mono rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                <div className="w-20">
-                  <Input
+
+                <div className="col-span-2">
+                  <input
+                    type="text"
                     placeholder="Unit"
-                    value={it.unit}
+                    value={item.unit}
                     onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                    className="h-8 text-xs font-mono"
+                    className="w-full h-7 px-1.5 text-xs text-center font-mono rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                <div className="w-24">
-                  <Input
+
+                <div className="col-span-2">
+                  <input
                     type="number"
                     step="0.01"
-                    placeholder="Unit Price"
-                    value={it.unitPrice}
-                    onChange={(e) => handleItemChange(idx, 'unitPrice', Number(e.target.value))}
-                    className="h-8 text-xs font-mono"
+                    min="0"
+                    placeholder="Price"
+                    value={item.unitPrice}
+                    onChange={(e) => handleItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                    className="w-full h-7 px-1.5 text-xs text-right font-mono rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
                   />
                 </div>
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(idx)}
-                    className="p-1.5 text-slate-400 hover:text-danger rounded-lg transition shrink-0"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+
+                <div className="col-span-1 text-right">
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(idx)}
+                      className="p-1 rounded text-slate-400 hover:text-[#D44848]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-
-          <div className="flex justify-between items-center bg-slate-50 dark:bg-navy-800/40 p-3 rounded-xl border border-border dark:border-navy-700 text-xs font-semibold">
-            <span>Subtotal:</span>
-            <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
-              ${calculatedSubtotal.toFixed(2)}
-            </span>
-          </div>
         </div>
-      </Modal>
+
+        {/* Financial Summary */}
+        <FinancialSummary
+          subtotal={totalPoAmount}
+          grandTotal={totalPoAmount}
+          balanceDue={totalPoAmount}
+        />
+      </FormDrawer>
+
+      {/* 6. Order Detail Drawer */}
+      {selectedOrder && (
+        <DetailDrawer
+          isOpen={!!selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          title={`Purchase Order #${selectedOrder.orderNumber}`}
+          subtitle={`Vendor: ${selectedOrder.vendorName}`}
+          status={selectedOrder.status}
+          width="lg"
+        >
+          <FinancialSummary
+            subtotal={selectedOrder.totalAmount}
+            grandTotal={selectedOrder.totalAmount}
+            balanceDue={selectedOrder.totalAmount}
+          />
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };

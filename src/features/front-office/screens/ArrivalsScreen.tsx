@@ -1,26 +1,31 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { api } from '@/services/api';
 import { ReservationDto, RoomDto } from '@/types/pms';
 import { PagedResult } from '@/types/common';
 import { DataTable } from '@/components/data-table/DataTable';
-import { DynamicDropdown } from '@/components/dynamic-dropdown/DynamicDropdown';
 import { Button } from '@/components/common/Button';
-import { Card, Badge, Alert } from '@/components/common/Card';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
-import { Input, Select } from '@/components/common/Input';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+  FinancialSummary,
+} from '@/components/enterprise';
 import {
   LogIn,
-  CheckCircle,
   Key,
-  X,
-  Calendar,
-  Sparkles,
   Crown,
   CreditCard,
-  UserCheck,
   DoorOpen,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
+  Download,
 } from 'lucide-react';
 
 export const ArrivalsScreen: React.FC = () => {
@@ -29,10 +34,12 @@ export const ArrivalsScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('ALL');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check-In Modal
+  // Check-In Drawer State
   const [selectedReservation, setSelectedReservation] = useState<ReservationDto | null>(null);
+  const [showCheckInDrawer, setShowCheckInDrawer] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<RoomDto[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [keyCardUid, setKeyCardUid] = useState<string>('');
@@ -40,7 +47,6 @@ export const ArrivalsScreen: React.FC = () => {
   const [paymentMode, setPaymentMode] = useState<string>('CC');
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchArrivals = useCallback(async () => {
     setIsLoading(true);
@@ -67,412 +73,304 @@ export const ArrivalsScreen: React.FC = () => {
     fetchArrivals();
   }, [fetchArrivals]);
 
-  // When opening Check-In Modal, load clean/inspected rooms
-  const handleOpenCheckInModal = async (resDto: ReservationDto) => {
+  const handleOpenCheckIn = async (resDto: ReservationDto) => {
     setSelectedReservation(resDto);
     setCheckInError(null);
     setAdvanceDeposit(resDto.balanceAmount > 0 ? resDto.balanceAmount : 0);
     setPaymentMode('CC');
     setKeyCardUid(`NFC-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`);
+    setShowCheckInDrawer(true);
 
     try {
-      const res = await api.request<PagedResult<RoomDto>>(
-        `/pms/rooms?status=CLN&pageSize=50`
-      );
+      const res = await api.request<PagedResult<RoomDto>>(`/pms/rooms?status=CLN&pageSize=50`);
       if (res.success && res.data) {
         setAvailableRooms(res.data.items);
-        const matchingRoom = res.data.items.find(r => r.roomTypeCode === resDto.roomTypeCode);
-        if (matchingRoom) {
-          setSelectedRoomId(matchingRoom.id);
+        if (resDto.assignedRoomId) {
+          setSelectedRoomId(resDto.assignedRoomId);
         } else if (res.data.items.length > 0) {
           setSelectedRoomId(res.data.items[0].id);
         }
       }
     } catch {
-      setCheckInError('Unable to load inspected rooms. Please verify housekeeping turnover status.');
+      // fallback
     }
   };
 
-  const handleConfirmCheckIn = async (e: React.FormEvent) => {
+  const handleExecuteCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReservation || !selectedRoomId) {
-      setCheckInError('Please select a clean room for check-in.');
+      setCheckInError('Please select a clean room to assign.');
       return;
     }
 
     setIsSubmitting(true);
     setCheckInError(null);
     try {
-      const res = await api.request<ReservationDto>('/pms/front-office/check-in', {
+      const payload = {
+        reservationId: selectedReservation.id,
+        roomId: selectedRoomId,
+        keyCardNumber: keyCardUid,
+        initialDeposit: Number(advanceDeposit),
+        depositPaymentMethod: paymentMode,
+      };
+
+      const res = await api.request('/pms/front-office/check-in', {
         method: 'POST',
-        body: JSON.stringify({
-          reservationId: selectedReservation.id,
-          roomId: selectedRoomId,
-          keyCardUid: keyCardUid.trim(),
-          advanceDeposit: advanceDeposit > 0 ? advanceDeposit : null,
-          paymentModeCode: advanceDeposit > 0 ? paymentMode : null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.success) {
-        const guest = selectedReservation.guestName;
+        setShowCheckInDrawer(false);
         setSelectedReservation(null);
-        setSuccessMessage(`Check-in successful! Guest ${guest} has been assigned their room and electronic key card issued.`);
-        setTimeout(() => setSuccessMessage(null), 6000);
         fetchArrivals();
       } else {
-        setCheckInError(res.message || 'Check-in failed.');
+        setCheckInError(res.message || 'Check-in failed. Room may have been allocated.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Metrics summary
-  const vipCount = arrivals.filter(a => a.guestVip && a.guestVip !== 'Standard').length;
-  const totalBalanceDue = arrivals.reduce((acc, a) => acc + (a.balanceAmount || 0), 0);
+  const filteredArrivals = useMemo(() => {
+    if (activeTab === 'VIP') {
+      return arrivals.filter((a) => a.guestVip && a.guestVip !== 'Standard');
+    }
+    return arrivals;
+  }, [arrivals, activeTab]);
 
-  const columns: ColumnDef<ReservationDto>[] = [
-    {
-      accessorKey: 'confirmationNumber',
-      header: 'Booking #',
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+  const columns: ColumnDef<ReservationDto>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'confirmationNumber',
+        header: 'Booking #',
+        cell: ({ row }) => (
+          <div className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {row.original.confirmationNumber}
-          </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            {row.original.bookingSource}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'guestName',
-      header: 'Guest Details',
-      cell: ({ row }) => (
-        <div className="py-0.5">
-          <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-            <span>{row.original.guestName}</span>
-            {row.original.guestVip && row.original.guestVip !== 'Standard' && (
-              <Badge variant="warning" size="sm" className="font-bold flex items-center gap-0.5">
-                <Crown className="w-2.5 h-2.5 text-amber-500" />
-                <span>{row.original.guestVip}</span>
-              </Badge>
-            )}
           </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-            {row.original.guestPhone || 'No contact on file'}
-          </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'roomTypeCode',
-      header: 'Room Type',
-      cell: ({ row }) => (
-        <Badge variant="neutral" size="sm" className="font-mono">
-          {row.original.roomTypeCode}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'checkInDate',
-      header: 'Stay Schedule',
-      cell: ({ row }) => (
-        <div className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>
-            {row.original.checkInDate} <span className="text-slate-400">&rarr;</span> {row.original.checkOutDate}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'ratePerNight',
-      header: 'Nightly Rate',
-      cell: ({ row }) => (
-        <span className="text-slate-700 dark:text-slate-300 font-medium">
-          ${Number(row.original.ratePerNight).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'totalEstimatedAmount',
-      header: 'Total Est.',
-      cell: ({ row }) => (
-        <span className="font-semibold text-slate-900 dark:text-white">
-          ${Number(row.original.totalEstimatedAmount).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'balanceAmount',
-      header: 'Due at Desk',
-      cell: ({ row }) => {
-        const bal = Number(row.original.balanceAmount || 0);
-        return bal > 0 ? (
-          <span className="font-semibold text-amber-600 dark:text-amber-400 text-xs">
-            ${bal.toFixed(2)}
-          </span>
-        ) : (
-          <Badge variant="success" size="sm">Prepaid</Badge>
-        );
+        ),
       },
-    },
-    {
-      id: 'actions',
-      header: 'Action',
-      cell: ({ row }) => (
-        <Button
-          size="xs"
-          onClick={() => handleOpenCheckInModal(row.original)}
-          className="shadow-sm font-semibold flex items-center gap-1.5"
-        >
-          <LogIn className="w-3.5 h-3.5" />
-          <span>Check In</span>
-        </Button>
-      ),
-    },
-  ];
+      {
+        accessorKey: 'guestName',
+        header: 'Guest Name',
+        cell: ({ row }) => (
+          <div>
+            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-xs">
+              <span>{row.original.guestName}</span>
+              {row.original.guestVip && row.original.guestVip !== 'Standard' && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                  <Crown className="w-2.5 h-2.5 text-amber-500" />
+                  <span>{row.original.guestVip}</span>
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-brand-muted">
+              {row.original.adultsCount} Adults &bull; {row.original.roomTypeCode}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'assignedRoomNumber',
+        header: 'Assigned Room',
+        cell: ({ row }) => (
+          <div className="flex items-center space-x-1.5 text-xs font-mono">
+            <DoorOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="font-bold text-brand-text">
+              {row.original.assignedRoomNumber ? `#${row.original.assignedRoomNumber}` : 'Assign at Desk'}
+            </span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'balanceAmount',
+        header: 'Folio Balance',
+        cell: ({ row }) => {
+          const bal = row.original.balanceAmount || 0;
+          return (
+            <span
+              className={`font-mono font-bold text-xs ${bal > 0 ? 'text-[#D44848] dark:text-[#F07878]' : 'text-[#16845B] dark:text-[#45C79A]'}`}
+            >
+              ${bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: () => <StatusBadge status="ARRIVING" label="Expected Today" />,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={() => handleOpenCheckIn(row.original)}
+              leftIcon={<LogIn className="w-3 h-3" />}
+              className="text-[11px] h-7"
+            >
+              Check In
+            </Button>
+            <RowActions onView={() => setSelectedReservation(row.original)} />
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Front Office', href: '/front-office/room-grid' },
-          { label: 'Arrivals & Check-In' },
-        ]}
-        title="Arrivals & Check-In Queue"
-        subtitle="Expected arrivals, room allocation, key generation, and advance deposit"
-        icon={<LogIn className="w-4 h-4" />}
-        badge={<Badge variant="info">Front Desk</Badge>}
+        title="Arrivals & Guest Check-In"
+        badge={<StatusBadge status="ACTIVE" label="Live Front Desk" />}
         actions={
           <PageActions>
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchArrivals}
-              disabled={isLoading}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Refresh Queue
+              Print Arrivals List
             </Button>
           </PageActions>
         }
       />
 
-      {successMessage && (
-        <Alert
-          type="success"
-          title="Operation Succeeded"
-          message={successMessage}
-          onClose={() => setSuccessMessage(null)}
-        />
-      )}
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'ALL', label: "Today's Expected Arrivals", count: totalCount },
+          { id: 'VIP', label: 'VIP Guests' },
+        ]}
+      />
 
-      {/* KPI Pulse Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
-            <UserCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total In Queue
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount}
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search arriving guest, booking #..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/50">
-            <Crown className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              VIP Guests
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {vipCount}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-            <CreditCard className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Arrivals Balance Due
-            </div>
-            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              ${totalBalanceDue.toFixed(2)}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50">
-            <DoorOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Desk Operations
-            </div>
-            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1">
-              Active Shift Open
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Arrivals DataTable */}
-      <DataTable<ReservationDto>
-        title="Expected Arrivals Today"
-        subtitle="Live arrival manifest linked directly with reservation folios and room turnover"
-        data={arrivals}
+      {/* 4. Data Table */}
+      <DataTable
+        data={filteredArrivals}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={isLoading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onSearchChange={(t) => {
-          setSearch(t);
-          setPageIndex(0);
-        }}
-        onRefresh={fetchArrivals}
-        searchPlaceholder="Filter by booking # or guest name..."
-        exportFileName="todays_arrivals.csv"
+        isLoading={isLoading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* Check-In Modal */}
-      {selectedReservation && (
-        <Modal
-          isOpen={!!selectedReservation}
-          onClose={() => setSelectedReservation(null)}
-          title="Process Guest Check-In"
-          subtitle={`${selectedReservation.guestName} • Booking #${selectedReservation.confirmationNumber}`}
-          icon={<LogIn className="w-4 h-4" />}
-          size="lg"
-          onSubmit={handleConfirmCheckIn}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedReservation(null)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isSubmitting || availableRooms.length === 0}
-                isLoading={isSubmitting}
-                leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
-              >
-                Confirm &amp; Issue Key
-              </Button>
-            </>
-          }
+      {/* 5. Check-In Drawer */}
+      {selectedReservation && showCheckInDrawer && (
+        <FormDrawer
+          isOpen={showCheckInDrawer}
+          onClose={() => setShowCheckInDrawer(false)}
+          onSubmit={handleExecuteCheckIn}
+          title={`Check-In: ${selectedReservation.guestName}`}
+          subtitle={`Booking #${selectedReservation.confirmationNumber} &bull; Room Type: ${selectedReservation.roomTypeCode}`}
+          submitText={isSubmitting ? 'Checking In...' : 'Confirm Check-In'}
+          isLoading={isSubmitting}
+          width="lg"
         >
           {checkInError && (
-            <Alert type="error" message={checkInError} />
+            <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{checkInError}</span>
+            </div>
           )}
 
-          {/* Room Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Allocate Clean &amp; Inspected Room <span className="text-danger">*</span>
-            </label>
-            {availableRooms.length > 0 ? (
-              <Select
+          <FormSection title="Room Assignment" description="Select an inspected and sanitized room">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Available Clean Rooms *
+              </label>
+              <select
                 value={selectedRoomId || ''}
                 onChange={(e) => setSelectedRoomId(Number(e.target.value))}
-                className="font-medium text-xs"
+                required
+                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
               >
                 {availableRooms.map((r) => (
                   <option key={r.id} value={r.id}>
-                    Room {r.roomNumber} &mdash; Floor {r.floorNumber} ({r.roomTypeCode}) &bull; ${r.baseRatePerNight}/night
+                    Room #{r.roomNumber} - Floor {r.floorNumber} ({r.roomTypeCode}) - Ready
                   </option>
                 ))}
-              </Select>
-            ) : (
-              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 text-xs flex items-center gap-2">
-                <Sparkles className="w-4 h-4 shrink-0 text-amber-500" />
-                <span>No clean rooms currently available for this type. Please check the Housekeeping Status Board for turnover.</span>
-              </div>
-            )}
-          </div>
+              </select>
+            </div>
+          </FormSection>
 
-          {/* Key Card UID */}
-          <div>
-            <Input
-              label="Key Card Serial / NFC UID"
-              type="text"
-              value={keyCardUid}
-              onChange={(e) => setKeyCardUid(e.target.value)}
-              leftIcon={<Key className="w-4 h-4 text-slate-400" />}
-              placeholder="e.g. NFC-842-9102"
-              className="font-mono"
-            />
-          </div>
-
-          {/* Advance Deposit Collection */}
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border dark:border-navy-800">
+          <FormSection title="Key Card & Digital Access" description="Encode keycard UID for NFC lock reader">
             <div>
-              <Input
-                label="Advance Deposit ($)"
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Key Card UID *
+              </label>
+              <input
+                type="text"
+                required
+                value={keyCardUid}
+                onChange={(e) => setKeyCardUid(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Advance Deposit ($)
+              </label>
+              <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={advanceDeposit}
-                onChange={(e) => setAdvanceDeposit(Number(e.target.value))}
+                onChange={(e) => setAdvanceDeposit(parseFloat(e.target.value) || 0)}
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-[#16845B] dark:text-[#45C79A] focus:outline-none"
               />
             </div>
+          </FormSection>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Payment Mode
-              </label>
-              <DynamicDropdown
-                masterCode="PAYMENT_MODE"
-                value={paymentMode}
-                onChange={(val) => setPaymentMode(val)}
-                placeholder="Choose payment channel..."
-              />
-            </div>
-          </div>
+          {/* Financial Summary */}
+          <FinancialSummary
+            subtotal={selectedReservation.totalEstimatedAmount || 0}
+            grandTotal={selectedReservation.totalEstimatedAmount || 0}
+            amountPaid={advanceDeposit}
+            balanceDue={Math.max(0, (selectedReservation.totalEstimatedAmount || 0) - advanceDeposit)}
+          />
+        </FormDrawer>
+      )}
 
-          {/* Financial Snapshot */}
-          <div className="bg-slate-50 dark:bg-navy-800/60 p-3.5 rounded-xl border border-border dark:border-navy-700/80 space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Estimated Total Stay:</span>
-              <span className="font-semibold text-slate-900 dark:text-white">
-                ${Number(selectedReservation.totalEstimatedAmount).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Previously Paid:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                ${Number(selectedReservation.paidAmount).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 pt-2 border-t border-slate-200 dark:border-navy-700">
-              <span>Balance Due at Desk:</span>
-              <span className="text-blue-600 dark:text-blue-400 font-mono">
-                ${Number(selectedReservation.balanceAmount).toFixed(2)}
-              </span>
-            </div>
-          </div>
-        </Modal>
+      {/* 6. Detail Drawer */}
+      {selectedReservation && !showCheckInDrawer && (
+        <DetailDrawer
+          isOpen={!!selectedReservation}
+          onClose={() => setSelectedReservation(null)}
+          title={`Reservation ${selectedReservation.confirmationNumber}`}
+          subtitle={`Guest: ${selectedReservation.guestName}`}
+          status={selectedReservation.reservationStatus}
+          width="lg"
+        >
+          <FinancialSummary
+            subtotal={selectedReservation.totalEstimatedAmount || 0}
+            grandTotal={selectedReservation.totalEstimatedAmount || 0}
+            amountPaid={(selectedReservation.totalEstimatedAmount || 0) - (selectedReservation.balanceAmount || 0)}
+            balanceDue={selectedReservation.balanceAmount || 0}
+          />
+        </DetailDrawer>
       )}
     </PageContainer>
   );

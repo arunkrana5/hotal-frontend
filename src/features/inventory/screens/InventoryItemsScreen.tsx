@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/data-table/DataTable';
 import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import {
@@ -9,22 +8,25 @@ import {
   RecordStockTransactionRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Input, Select, Textarea, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import {
+  PageTabs,
+  ListToolbar,
+  RowActions,
+  StatusBadge,
+  FormDrawer,
+  FormSection,
+  DetailDrawer,
+} from '@/components/enterprise';
+import { DataTable } from '@/components/data-table/DataTable';
 import {
   Boxes,
   Plus,
-  RefreshCw,
-  Search,
-  AlertTriangle,
   ArrowDownUp,
   MapPin,
-  X,
-  CheckCircle2,
-  DollarSign,
-  PackageCheck,
+  Download,
+  AlertCircle,
+  Package,
 } from 'lucide-react';
 
 export const InventoryItemsScreen: React.FC = () => {
@@ -33,17 +35,19 @@ export const InventoryItemsScreen: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [lowStockOnly, setLowStockOnly] = useState<boolean>(false);
 
-  // Modals
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [showAdjustModal, setShowAdjustModal] = useState<boolean>(false);
+  // Tabs & Filters
+  const [categoryTab, setCategoryTab] = useState<string>('ALL');
+  const [search, setSearch] = useState<string>('');
+
+  // Drawers
+  const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [showAdjustDrawer, setShowAdjustDrawer] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItemDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Create Item Form
+  // Create Form State
   const [newItem, setNewItem] = useState<CreateInventoryItemRequest>({
     itemCode: '',
     itemName: '',
@@ -57,7 +61,7 @@ export const InventoryItemsScreen: React.FC = () => {
     locationBin: 'BIN-01',
   });
 
-  // Adjust Form
+  // Adjust Form State
   const [adjustData, setAdjustData] = useState<{
     type: string;
     qty: number;
@@ -70,15 +74,14 @@ export const InventoryItemsScreen: React.FC = () => {
     notes: '',
   });
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams({
       page: (pageIndex + 1).toString(),
       pageSize: pageSize.toString(),
     });
-    if (search) query.append('search', search);
-    if (categoryFilter) query.append('category', categoryFilter);
-    if (lowStockOnly) query.append('lowStockOnly', 'true');
+    if (search.trim()) query.append('search', search.trim());
+    if (categoryTab !== 'ALL' && categoryTab !== 'LOW_STOCK') query.append('category', categoryTab);
 
     const res = await api.get<PagedResult<InventoryItemDto>>(`/inventory/items?${query.toString()}`);
     if (res.success && res.data) {
@@ -86,18 +89,24 @@ export const InventoryItemsScreen: React.FC = () => {
       setTotalCount(res.data.totalCount);
     }
     setLoading(false);
-  };
+  }, [pageIndex, pageSize, search, categoryTab]);
 
   useEffect(() => {
     fetchItems();
-  }, [pageIndex, pageSize, search, categoryFilter, lowStockOnly]);
+  }, [fetchItems]);
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newItem.itemCode.trim() || !newItem.itemName.trim()) {
+      setErrorMsg('Item code and item name are required.');
+      return;
+    }
+
     setSubmitting(true);
+    setErrorMsg(null);
     const res = await api.post<InventoryItemDto>('/inventory/items', newItem);
     if (res.success) {
-      setShowCreateModal(false);
+      setShowCreateDrawer(false);
       setNewItem({
         itemCode: '',
         itemName: '',
@@ -111,19 +120,22 @@ export const InventoryItemsScreen: React.FC = () => {
         locationBin: 'BIN-01',
       });
       fetchItems();
+    } else {
+      setErrorMsg(res.message || 'Failed to create item.');
     }
     setSubmitting(false);
   };
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItem) return;
-    setSubmitting(true);
+    if (!selectedItem || adjustData.qty <= 0) return;
 
+    setSubmitting(true);
+    setErrorMsg(null);
     const req: RecordStockTransactionRequest = {
       inventoryItemId: selectedItem.id,
       transactionType: adjustData.type,
-      quantity: adjustData.qty,
+      quantity: Number(adjustData.qty),
       unitCost: selectedItem.unitCost,
       departmentCode: adjustData.department,
       notes: adjustData.notes,
@@ -131,79 +143,71 @@ export const InventoryItemsScreen: React.FC = () => {
 
     const res = await api.post('/inventory/transactions', req);
     if (res.success) {
-      setShowAdjustModal(false);
+      setShowAdjustDrawer(false);
       setSelectedItem(null);
       fetchItems();
+    } else {
+      setErrorMsg(res.message || 'Stock adjustment failed.');
     }
     setSubmitting(false);
   };
 
-  const openAdjust = (item: InventoryItemDto) => {
-    setSelectedItem(item);
-    setAdjustData({
-      type: 'RECEIPT',
-      qty: 10,
-      department: 'HK',
-      notes: 'Standard stock adjustment',
-    });
-    setShowAdjustModal(true);
-  };
+  const filteredItems = useMemo(() => {
+    if (categoryTab === 'LOW_STOCK') {
+      return items.filter((i) => i.currentStock <= i.reorderLevel);
+    }
+    return items;
+  }, [items, categoryTab]);
 
-  const totalValuation = items.reduce((sum, i) => sum + (i.currentStock * i.unitCost || 0), 0);
-  const lowStockCount = items.filter(i => i.currentStock <= i.reorderLevel).length;
-
-  const columns = useMemo<ColumnDef<InventoryItemDto>[]>(
+  const columns: ColumnDef<InventoryItemDto>[] = useMemo(
     () => [
       {
         accessorKey: 'itemCode',
-        header: 'SKU / Code',
+        header: 'SKU Code',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
           </span>
         ),
       },
       {
         accessorKey: 'itemName',
-        header: 'Item Description',
+        header: 'Item Specification',
         cell: (info) => (
           <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{info.getValue() as string}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-              <MapPin className="w-3 h-3 text-slate-400" />
-              <span>Bin: {info.row.original.locationBin || 'Central Stores'}</span>
+            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+              {info.getValue() as string}
+            </div>
+            <div className="text-[11px] text-brand-muted">
+              Category: {info.row.original.category} &bull; Unit: {info.row.original.unitOfMeasure}
             </div>
           </div>
         ),
       },
       {
-        accessorKey: 'category',
-        header: 'Category',
+        accessorKey: 'locationBin',
+        header: 'Storage Bin',
         cell: (info) => (
-          <Badge variant="neutral" size="sm" className="font-mono">
-            {info.getValue() as string}
-          </Badge>
+          <div className="flex items-center space-x-1 text-xs font-mono text-brand-muted">
+            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+            <span>{info.getValue() as string || 'CENTRAL'}</span>
+          </div>
         ),
       },
       {
         accessorKey: 'currentStock',
-        header: 'Stock On-Hand',
-        cell: (info) => {
-          const item = info.row.original;
-          const isLow = item.currentStock <= item.reorderLevel;
+        header: 'Stock / Reorder',
+        cell: ({ row }) => {
+          const current = row.original.currentStock;
+          const reorder = row.original.reorderLevel;
+          const isLow = current <= reorder;
+
           return (
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className={`font-mono font-bold text-xs ${isLow ? 'text-danger' : 'text-slate-900 dark:text-white'}`}>
-                  {item.currentStock} {item.unitOfMeasure}
-                </span>
-                {isLow && (
-                  <Badge variant="danger" size="sm" dot>Low Stock</Badge>
-                )}
-              </div>
-              <div className="text-[10px] text-slate-400 font-mono">
-                Reorder @ {item.reorderLevel}
-              </div>
+            <div className="text-xs font-mono">
+              <span className={`font-bold ${isLow ? 'text-[#D44848] dark:text-[#F07878]' : 'text-brand-text'}`}>
+                {current}
+              </span>
+              <span className="text-brand-muted text-[11px]"> / Par {reorder}</span>
             </div>
           );
         },
@@ -212,37 +216,49 @@ export const InventoryItemsScreen: React.FC = () => {
         accessorKey: 'unitCost',
         header: 'Unit Cost',
         cell: (info) => (
-          <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">
+          <span className="font-mono text-xs text-brand-muted">
             ${(info.getValue() as number).toFixed(2)}
           </span>
         ),
       },
       {
-        id: 'totalValue',
-        header: 'Inventory Value',
-        cell: (info) => {
-          const item = info.row.original;
-          const val = item.currentStock * item.unitCost;
-          return (
-            <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-              ${val.toFixed(2)}
-            </span>
+        accessorKey: 'totalValue',
+        header: 'Total Value',
+        cell: ({ row }) => (
+          <span className="font-mono font-bold text-xs text-brand-text">
+            ${(row.original.currentStock * row.original.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </span>
+        ),
+      },
+      {
+        id: 'status',
+        header: 'Stock Health',
+        cell: ({ row }) => {
+          const isLow = row.original.currentStock <= row.original.reorderLevel;
+          return isLow ? (
+            <StatusBadge status="WARNING" label="Low Stock Alert" />
+          ) : (
+            <StatusBadge status="AVAILABLE" label="In Stock" />
           );
         },
       },
       {
         id: 'actions',
-        header: 'Stock Action',
-        cell: (info) => (
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => openAdjust(info.row.original)}
-            className="font-semibold text-xs flex items-center gap-1"
-          >
-            <ArrowDownUp className="w-3 h-3" />
-            <span>Adjust / Issue</span>
-          </Button>
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedItem(row.original)}
+            customActions={[
+              {
+                label: 'Adjust Stock',
+                icon: <ArrowDownUp className="w-3.5 h-3.5 text-brand-primary" />,
+                onClick: () => {
+                  setSelectedItem(row.original);
+                  setShowAdjustDrawer(true);
+                },
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -251,337 +267,299 @@ export const InventoryItemsScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Inventory', href: '/inventory/items' },
-          { label: 'Stock Items' },
-        ]}
-        title="Stores & Inventory Management"
-        subtitle="Central stores stock balance, bin location tracking, par replenishment & valuation ledgers"
+        title="Inventory & Stock Registry"
+        badge={<StatusBadge status="ACTIVE" label="Central Stores" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => setShowCreateModal(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
             >
-              Add Inventory Item
+              Export
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Add Stock SKU
             </Button>
           </PageActions>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
-            <Boxes className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total SKUs Tracked
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              {totalCount} SKUs
-            </div>
-          </div>
-        </Card>
+      {/* 2. Page Tabs */}
+      <PageTabs
+        activeTab={categoryTab}
+        onChange={setCategoryTab}
+        tabs={[
+          { id: 'ALL', label: 'All Items', count: totalCount },
+          { id: 'LOW_STOCK', label: 'Low Stock Alerts' },
+          { id: 'LINEN', label: 'Linen & Housekeeping' },
+          { id: 'FB', label: 'F&B Raw Materials' },
+          { id: 'MAINTENANCE', label: 'Engineering Spares' },
+        ]}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-100 dark:border-rose-900/50 shrink-0">
-            <AlertTriangle className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Low Stock Warnings
-            </div>
-            <div className="text-lg font-bold text-rose-600 dark:text-rose-400 tracking-tight">
-              {lowStockCount} Items
-            </div>
-          </div>
-        </Card>
+      {/* 3. List Toolbar */}
+      <ListToolbar
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search SKU code, name, storage bin..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
+      />
 
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50 shrink-0">
-            <DollarSign className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Stores Valuation
-            </div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tracking-tight font-mono">
-              ${totalValuation.toFixed(2)}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
-            <PackageCheck className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Stores Reorder Engine
-            </div>
-            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
-              Automated Indent Gen
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Item Categories</option>
-            <option value="LINEN">Linen &amp; Towels</option>
-            <option value="FB">Food &amp; Beverage</option>
-            <option value="CLEANING">Cleaning &amp; Chemicals</option>
-            <option value="AMENITIES">Room Amenities</option>
-            <option value="MAINTENANCE">Engineering Parts</option>
-          </Select>
-        </div>
-
-        <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={lowStockOnly}
-            onChange={(e) => {
-              setLowStockOnly(e.target.checked);
-              setPageIndex(0);
-            }}
-            className="rounded border-slate-300 text-brand-indigo focus:ring-brand-indigo"
-          />
-          <span>Show Below Reorder Level Only</span>
-        </label>
-      </div>
-
-      {/* Inventory DataTable */}
-      <DataTable<InventoryItemDto>
-        title="Central Stores Stock Manifest"
-        subtitle="Physical perpetual inventory with minimum par levels and bin coordinates"
-        data={items}
+      {/* 4. Data Table */}
+      <DataTable
+        data={filteredItems}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onSearchChange={(s) => {
-          setSearch(s);
-          setPageIndex(0);
-        }}
-        onRefresh={fetchItems}
-        searchPlaceholder="Filter items by SKU, name, or bin..."
-        exportFileName="inventory_stock.csv"
+        isLoading={loading}
+        enableSearch={false}
+        enableExport={true}
       />
 
-      {/* Add Item Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Register New Stores Inventory SKU"
-        subtitle="Define item specifications, reorder triggers, and stores bin location"
-        icon={<Boxes className="w-4 h-4" />}
-        size="lg"
+      {/* 5. Create SKU Drawer */}
+      <FormDrawer
+        isOpen={showCreateDrawer}
+        onClose={() => setShowCreateDrawer(false)}
         onSubmit={handleCreateItem}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowCreateModal(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !newItem.itemCode || !newItem.itemName}
-              isLoading={submitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Save Inventory SKU
-            </Button>
-          </>
-        }
+        title="Add Inventory Item"
+        subtitle="Register new SKU into central stores catalog"
+        submitText={submitting ? 'Registering...' : 'Register Item'}
+        isLoading={submitting}
+        width="lg"
       >
-        <FormGrid cols={2}>
-          <Input
-            label="SKU / Item Code *"
-            required
-            value={newItem.itemCode}
-            onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
-            placeholder="e.g. AMN-SHMP-50ML"
-            className="font-mono uppercase"
-          />
-          <Input
-            label="Item Name *"
-            required
-            value={newItem.itemName}
-            onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
-            placeholder="e.g. Organic Bergamot Shampoo 50ml"
-          />
-        </FormGrid>
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        <FormGrid cols={3}>
+        <FormSection title="SKU Identification" description="Code, category, and storage bin">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Category
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Item Code *
             </label>
-            <Select
-              value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-            >
-              <option value="LINEN">Linen &amp; Towels</option>
-              <option value="FB">Food &amp; Beverage</option>
-              <option value="CLEANING">Cleaning &amp; Housekeeping</option>
-              <option value="AMENITIES">Guest Room Amenities</option>
-              <option value="MAINTENANCE">Engineering Maintenance</option>
-            </Select>
+            <input
+              type="text"
+              required
+              placeholder="e.g. LN-BATH-TOWEL-01"
+              value={newItem.itemCode}
+              onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value.toUpperCase() })}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
           </div>
 
-          <Input
-            label="Unit of Measure"
-            value={newItem.unitOfMeasure}
-            onChange={(e) => setNewItem({ ...newItem, unitOfMeasure: e.target.value })}
-            placeholder="PCS / BTL / KG"
-            className="font-mono"
-          />
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Item Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Premium White Bath Towel"
+              value={newItem.itemName}
+              onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-          <Input
-            label="Unit Cost ($) *"
-            type="number"
-            step="0.01"
-            required
-            value={newItem.unitCost}
-            onChange={(e) => setNewItem({ ...newItem, unitCost: Number(e.target.value) })}
-            className="font-mono"
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Inventory Category *
+            </label>
+            <select
+              value={newItem.category}
+              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            >
+              <option value="LINEN">Linen &amp; Housekeeping</option>
+              <option value="FB">Food &amp; Beverage</option>
+              <option value="MAINTENANCE">Engineering Spares</option>
+              <option value="OFFICE">Office Stationery</option>
+            </select>
+          </div>
 
-        <FormGrid cols={3}>
-          <Input
-            label="Current Opening Stock"
-            type="number"
-            value={newItem.currentStock}
-            onChange={(e) => setNewItem({ ...newItem, currentStock: Number(e.target.value) })}
-            className="font-mono"
-          />
-          <Input
-            label="Reorder Trigger Level *"
-            type="number"
-            required
-            value={newItem.reorderLevel}
-            onChange={(e) => setNewItem({ ...newItem, reorderLevel: Number(e.target.value) })}
-            className="font-mono"
-          />
-          <Input
-            label="Location Bin / Shelf"
-            value={newItem.locationBin}
-            onChange={(e) => setNewItem({ ...newItem, locationBin: e.target.value })}
-            placeholder="e.g. AISLE-2-BIN-04"
-          />
-        </FormGrid>
-      </Modal>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Storage Bin / Warehouse Location
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. RACK-B-04"
+              value={newItem.locationBin}
+              onChange={(e) => setNewItem({ ...newItem, locationBin: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
 
-      {/* Stock Adjustment Modal */}
-      {selectedItem && (
-        <Modal
-          isOpen={showAdjustModal}
-          onClose={() => setShowAdjustModal(false)}
-          title="Adjust Stock / Issue To Department"
-          subtitle={`${selectedItem.itemName} (${selectedItem.itemCode})`}
-          icon={<ArrowDownUp className="w-4 h-4" />}
-          size="md"
-          onSubmit={handleAdjustStock}
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdjustModal(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={submitting || adjustData.qty <= 0}
-                isLoading={submitting}
-                leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-              >
-                Record Transaction
-              </Button>
-            </>
-          }
-        >
-          <FormGrid cols={2}>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Transaction Type
-              </label>
-              <Select
-                value={adjustData.type}
-                onChange={(e) => setAdjustData({ ...adjustData, type: e.target.value })}
-              >
-                <option value="ISSUE">Issue to Department (-)</option>
-                <option value="RECEIPT">Stock Receipt / GRN (+)</option>
-                <option value="AUDIT_ADJUST">Physical Audit Correction</option>
-                <option value="DAMAGE">Damaged / Expired Write-Off</option>
-              </Select>
-            </div>
+        <FormSection title="Stock & Valuation Parameters" description="Unit cost, par levels, and initial stock">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Initial Stock Qty *
+            </label>
+            <input
+              type="number"
+              min="0"
+              required
+              value={newItem.currentStock}
+              onChange={(e) => setNewItem({ ...newItem, currentStock: parseInt(e.target.value) || 0 })}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-            <Input
-              label={`Quantity (${selectedItem.unitOfMeasure}) *`}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Unit Cost ($) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              value={newItem.unitCost}
+              onChange={(e) => setNewItem({ ...newItem, unitCost: parseFloat(e.target.value) || 0 })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Reorder Par Level *
+            </label>
+            <input
               type="number"
               min="1"
               required
-              value={adjustData.qty}
-              onChange={(e) => setAdjustData({ ...adjustData, qty: Number(e.target.value) })}
-              className="font-mono"
+              value={newItem.reorderLevel}
+              onChange={(e) => setNewItem({ ...newItem, reorderLevel: parseInt(e.target.value) || 10 })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             />
-          </FormGrid>
+          </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Receiving / Charging Department
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Unit of Measure
             </label>
-            <Select
-              value={adjustData.department}
-              onChange={(e) => setAdjustData({ ...adjustData, department: e.target.value })}
-            >
-              <option value="HK">Housekeeping &amp; Laundry</option>
-              <option value="FB">Food &amp; Beverage</option>
-              <option value="FO">Front Office</option>
-              <option value="MAINT">Maintenance &amp; Engineering</option>
-              <option value="SPA">Spa &amp; Wellness</option>
-            </Select>
-          </div>
-
-          <div>
-            <Textarea
-              label="Transaction Remarks / Storekeeper Voucher #"
-              rows={2}
-              value={adjustData.notes}
-              onChange={(e) => setAdjustData({ ...adjustData, notes: e.target.value })}
-              placeholder="e.g. Issued for floor 2 linen replenishment..."
+            <input
+              type="text"
+              placeholder="e.g. PCS, BOX, KG, LTR"
+              value={newItem.unitOfMeasure}
+              onChange={(e) => setNewItem({ ...newItem, unitOfMeasure: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             />
           </div>
-        </Modal>
+        </FormSection>
+      </FormDrawer>
+
+      {/* 6. Adjust Stock Drawer */}
+      {selectedItem && showAdjustDrawer && (
+        <FormDrawer
+          isOpen={showAdjustDrawer}
+          onClose={() => setShowAdjustDrawer(false)}
+          onSubmit={handleAdjustStock}
+          title={`Adjust Stock: ${selectedItem.itemName}`}
+          subtitle={`Current Stock: ${selectedItem.currentStock} ${selectedItem.unitOfMeasure} | Code: ${selectedItem.itemCode}`}
+          submitText={submitting ? 'Recording...' : 'Post Adjustment'}
+          isLoading={submitting}
+          width="md"
+        >
+          <FormSection title="Movement Parameters" description="Receipt or issue transaction">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Transaction Type *
+              </label>
+              <select
+                value={adjustData.type}
+                onChange={(e) => setAdjustData({ ...adjustData, type: e.target.value })}
+                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              >
+                <option value="RECEIPT">Goods Receipt (Stock In +)</option>
+                <option value="ISSUE">Department Issue (Stock Out -)</option>
+                <option value="ADJUSTMENT">Audit Correction / Spoilage</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={adjustData.qty}
+                onChange={(e) => setAdjustData({ ...adjustData, qty: parseInt(e.target.value) || 1 })}
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Department Code / Reason
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. HK-FLOOR-2 / Monthly Physical Count"
+                value={adjustData.notes}
+                onChange={(e) => setAdjustData({ ...adjustData, notes: e.target.value })}
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          </FormSection>
+        </FormDrawer>
+      )}
+
+      {/* 7. Detail Drawer */}
+      {selectedItem && !showAdjustDrawer && (
+        <DetailDrawer
+          isOpen={!!selectedItem}
+          onClose={() => setSelectedItem(null)}
+          title={selectedItem.itemName}
+          subtitle={`SKU #${selectedItem.itemCode}`}
+          status={selectedItem.currentStock <= selectedItem.reorderLevel ? 'WARNING' : 'AVAILABLE'}
+          width="md"
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Current Stock</span>
+                <span className="font-mono font-bold text-base text-brand-text">
+                  {selectedItem.currentStock} {selectedItem.unitOfMeasure}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Reorder Par Level</span>
+                <span className="font-mono text-brand-text">{selectedItem.reorderLevel}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Unit Cost</span>
+                <span className="font-mono text-brand-text">${selectedItem.unitCost.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Total Valuation</span>
+                <span className="font-mono font-bold text-sm text-[#16845B] dark:text-[#45C79A]">
+                  ${(selectedItem.currentStock * selectedItem.unitCost).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </DetailDrawer>
       )}
     </PageContainer>
   );
