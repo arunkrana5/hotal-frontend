@@ -5,6 +5,7 @@ import { PagedResult } from '@/types/common';
 import { HousekeepingTaskDto } from '@/types/operations';
 import { RoomDto } from '@/types/pms';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -340,53 +341,55 @@ export const HousekeepingTasksScreen: React.FC = () => {
 
         <FormSection title="Task Parameters" description="Select target room and cleaning protocol">
           <div className="sm:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Select Room *
-            </label>
-            <select
-              value={selectedRoomId}
-              onChange={(e) => setSelectedRoomId(Number(e.target.value))}
+            <UniversalSelect
+              label="Select Room"
               required
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              {availableRooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  Room #{r.roomNumber} - Floor {r.floorNumber} ({r.roomTypeCode}) - Current Status: {r.roomStatusCode}
-                </option>
-              ))}
-            </select>
+              size="sm"
+              value={selectedRoomId}
+              onChange={(val) => setSelectedRoomId(Number(val))}
+              options={availableRooms.map((r) => ({
+                value: r.id,
+                label: `Room #${r.roomNumber} - Floor ${r.floorNumber} (${r.roomTypeCode}) - Current Status: ${r.roomStatusCode}`,
+                badge: r.roomTypeCode,
+              }))}
+              placeholder="Select target room..."
+              clearable={false}
+            />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Task Type *
-            </label>
-            <select
+            <UniversalSelect
+              label="Task Type"
+              required
+              size="sm"
               value={taskType}
-              onChange={(e) => setTaskType(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="DAILY_CLEAN">Daily Service Clean</option>
-              <option value="CHECKOUT_CLEAN">Checkout Turnover</option>
-              <option value="DEEP_CLEAN">Deep Sanitation</option>
-              <option value="TURNDOWN">Evening Turndown</option>
-            </select>
+              onChange={(val) => setTaskType(val || 'DAILY_CLEAN')}
+              options={[
+                { value: 'DAILY_CLEAN', label: 'Daily Service Clean', badge: 'DAILY' },
+                { value: 'CHECKOUT_CLEAN', label: 'Checkout Turnover', badge: 'DEP' },
+                { value: 'DEEP_CLEAN', label: 'Deep Sanitation', badge: 'DEEP' },
+                { value: 'TURNDOWN', label: 'Evening Turndown', badge: 'TRN' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Priority *
-            </label>
-            <select
+            <UniversalSelect
+              label="Priority"
+              required
+              size="sm"
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="URGENT">Urgent (VIP Arriving)</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium (Normal)</option>
-              <option value="LOW">Low</option>
-            </select>
+              onChange={(val) => setPriority(val || 'MEDIUM')}
+              masterType="TASK_PRIORITY"
+              options={[
+                { value: 'URGENT', label: 'Urgent (VIP Arriving)', badge: 'URG' },
+                { value: 'HIGH', label: 'High Priority', badge: 'HI' },
+                { value: 'MEDIUM', label: 'Medium (Normal)', badge: 'MED' },
+                { value: 'LOW', label: 'Low Priority', badge: 'LOW' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div className="sm:col-span-2">

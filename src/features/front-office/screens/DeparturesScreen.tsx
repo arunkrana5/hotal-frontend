@@ -6,6 +6,7 @@ import { ReservationDto } from '@/types/pms';
 import { PagedResult } from '@/types/common';
 import { DataTable } from '@/components/data-table/DataTable';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -296,19 +297,20 @@ export const DeparturesScreen: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-                Payment Method
-              </label>
-              <select
+              <UniversalSelect
+                label="Payment Method"
+                size="sm"
                 value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-              >
-                <option value="CC">Credit / Debit Card</option>
-                <option value="CASH">Cash Settlement</option>
-                <option value="BANK">Bank Wire</option>
-                <option value="DIRECT_BILL">Company Direct Bill</option>
-              </select>
+                onChange={(val) => setPaymentMode(val || 'CC')}
+                masterType="PAYMENT_METHOD"
+                options={[
+                  { value: 'CC', label: 'Credit / Debit Card', badge: 'CC' },
+                  { value: 'CASH', label: 'Cash Settlement', badge: 'CSH' },
+                  { value: 'BANK', label: 'Bank Wire', badge: 'WIRE' },
+                  { value: 'DIRECT_BILL', label: 'Company Direct Bill', badge: 'CORP' },
+                ]}
+                clearable={false}
+              />
             </div>
 
             <div className="sm:col-span-2">

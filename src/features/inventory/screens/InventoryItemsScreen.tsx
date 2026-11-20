@@ -8,6 +8,7 @@ import {
   RecordStockTransactionRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -379,19 +380,20 @@ export const InventoryItemsScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Inventory Category *
-            </label>
-            <select
+            <UniversalSelect
+              label="Inventory Category"
+              required
+              size="sm"
               value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="LINEN">Linen &amp; Housekeeping</option>
-              <option value="FB">Food &amp; Beverage</option>
-              <option value="MAINTENANCE">Engineering Spares</option>
-              <option value="OFFICE">Office Stationery</option>
-            </select>
+              onChange={(val) => setNewItem({ ...newItem, category: val || 'LINEN' })}
+              options={[
+                { value: 'LINEN', label: 'Linen & Housekeeping', badge: 'LIN' },
+                { value: 'FB', label: 'Food & Beverage', badge: 'FB' },
+                { value: 'MAINTENANCE', label: 'Engineering Spares', badge: 'ENG' },
+                { value: 'OFFICE', label: 'Office Stationery', badge: 'OFF' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
@@ -481,18 +483,19 @@ export const InventoryItemsScreen: React.FC = () => {
         >
           <FormSection title="Movement Parameters" description="Receipt or issue transaction">
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-                Transaction Type *
-              </label>
-              <select
+              <UniversalSelect
+                label="Transaction Type"
+                required
+                size="sm"
                 value={adjustData.type}
-                onChange={(e) => setAdjustData({ ...adjustData, type: e.target.value })}
-                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-              >
-                <option value="RECEIPT">Goods Receipt (Stock In +)</option>
-                <option value="ISSUE">Department Issue (Stock Out -)</option>
-                <option value="ADJUSTMENT">Audit Correction / Spoilage</option>
-              </select>
+                onChange={(val) => setAdjustData({ ...adjustData, type: val || 'RECEIPT' })}
+                options={[
+                  { value: 'RECEIPT', label: 'Goods Receipt (Stock In +)', badge: 'IN' },
+                  { value: 'ISSUE', label: 'Department Issue (Stock Out -)', badge: 'OUT' },
+                  { value: 'ADJUSTMENT', label: 'Audit Correction / Spoilage', badge: 'ADJ' },
+                ]}
+                clearable={false}
+              />
             </div>
 
             <div>

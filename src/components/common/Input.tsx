@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { cn } from '@/utils/cn';
+import { UniversalSelect, SelectOption } from './UniversalSelect';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -114,63 +115,69 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
 
 Textarea.displayName = 'Textarea';
 
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   label?: string;
   error?: string;
   helperText?: string;
   isRequired?: boolean;
   options?: { value: string | number; label: string }[];
+  size?: 'sm' | 'md' | 'lg';
+  placeholder?: string;
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, helperText, isRequired, children, options, id, ...props }, ref) => {
-    const selectId = id || props.name;
+export const Select = forwardRef<HTMLButtonElement, SelectProps>(
+  ({ className, label, error, helperText, isRequired, children, options, id, value, onChange, disabled, placeholder, size = 'sm', ...props }, ref) => {
+    const selectOptions = React.useMemo(() => {
+      if (options && options.length > 0) {
+        return options.map((opt) => ({
+          value: String(opt.value),
+          label: opt.label,
+        }));
+      }
+
+      const parsed: SelectOption[] = [];
+      React.Children.forEach(children, (child) => {
+        if (React.isValidElement(child)) {
+          const childProps = child.props as any;
+          parsed.push({
+            value: childProps.value !== undefined ? String(childProps.value) : String(childProps.children || ''),
+            label: String(childProps.children || childProps.value || ''),
+            disabled: childProps.disabled,
+          });
+        }
+      });
+      return parsed;
+    }, [options, children]);
+
+    const handleChange = (val: any) => {
+      if (onChange) {
+        const syntheticEvent = {
+          target: { value: val ?? '', name: props.name },
+          currentTarget: { value: val ?? '', name: props.name },
+        } as React.ChangeEvent<HTMLSelectElement>;
+        onChange(syntheticEvent);
+      }
+    };
 
     return (
       <div className="w-full space-y-1 text-left">
-        {label && (
-          <label
-            htmlFor={selectId}
-            className="flex items-center space-x-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-          >
-            <span>{label}</span>
-            {isRequired && <span className="text-red-500 font-bold">*</span>}
-          </label>
-        )}
-        <div className="relative">
-          <select
-            id={selectId}
-            ref={ref}
-            className={cn(
-              'flex h-9 w-full rounded-lg border bg-white px-3 py-1.5 text-xs text-slate-900 transition-all duration-150 appearance-none',
-              'focus:outline-none focus:ring-2 focus:ring-offset-0',
-              'dark:bg-brand-darkSurface dark:text-slate-100 shadow-soft-xs',
-              error
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-400/20'
-                : 'border-brand-border focus:border-blue-brand focus:ring-blue-brand/20 dark:border-brand-darkBorder',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              className
-            )}
-            {...props}
-          >
-            {options
-              ? options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))
-              : children}
-          </select>
-          <div className="absolute right-3 top-2.5 pointer-events-none text-slate-400">
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-              <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-            </svg>
-          </div>
-        </div>
-        {error && <p className="text-[11px] text-red-500 font-medium">{error}</p>}
-        {helperText && !error && (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{helperText}</p>
-        )}
+        <UniversalSelect
+          ref={ref}
+          id={id || props.name}
+          name={props.name}
+          label={label}
+          description={helperText}
+          error={error}
+          required={isRequired}
+          disabled={disabled}
+          options={selectOptions}
+          value={value !== undefined && value !== null ? String(value) : ''}
+          onChange={handleChange}
+          placeholder={placeholder || 'Select...'}
+          size={size}
+          className={className}
+          clearable={false}
+        />
       </div>
     );
   }

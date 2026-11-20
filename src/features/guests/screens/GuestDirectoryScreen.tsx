@@ -6,6 +6,7 @@ import { GuestDto, CreateGuestRequest } from '@/types/pms';
 import { PagedResult } from '@/types/common';
 import { DataTable } from '@/components/data-table/DataTable';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -353,19 +354,19 @@ export const GuestDirectoryScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              VIP Tier Status
-            </label>
-            <select
+            <UniversalSelect
+              label="VIP Tier Status"
+              size="sm"
               value={vipStatus}
-              onChange={(e) => setVipStatus(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="Standard">Standard Guest</option>
-              <option value="Silver">Silver Tier</option>
-              <option value="Gold">Gold Tier VIP</option>
-              <option value="Platinum">Platinum / Diamond VIP</option>
-            </select>
+              onChange={(val) => setVipStatus(val || 'Standard')}
+              options={[
+                { value: 'Standard', label: 'Standard Guest', badge: 'STD' },
+                { value: 'Silver', label: 'Silver Tier', badge: 'SLV' },
+                { value: 'Gold', label: 'Gold Tier VIP', badge: 'GLD' },
+                { value: 'Platinum', label: 'Platinum / Diamond VIP', badge: 'PLT' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
@@ -412,18 +413,18 @@ export const GuestDirectoryScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              ID Document Type
-            </label>
-            <select
+            <UniversalSelect
+              label="ID Document Type"
+              size="sm"
               value={idDocType}
-              onChange={(e) => setIdDocType(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="Passport">Passport</option>
-              <option value="NationalID">National ID / Aadhaar</option>
-              <option value="DrivingLicense">Driving License</option>
-            </select>
+              onChange={(val) => setIdDocType(val || 'Passport')}
+              options={[
+                { value: 'Passport', label: 'Passport', badge: 'PPT' },
+                { value: 'NationalID', label: 'National ID / Aadhaar', badge: 'NID' },
+                { value: 'DrivingLicense', label: 'Driving License', badge: 'DL' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>

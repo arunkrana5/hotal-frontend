@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DynamicFormDto, DynamicFormFieldDto } from '@/types/configuration';
 import { DynamicDropdown } from '@/components/dynamic-dropdown/DynamicDropdown';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { Button } from '@/components/common/Button';
 import { AlertCircle, CheckCircle, Save, RotateCcw } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -118,13 +119,13 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
           );
         }
         return (
-          <select
-            value={value}
-            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">{field.placeholder || `Select ${field.fieldLabel}...`}</option>
-          </select>
+          <UniversalSelect
+            options={[]}
+            value={value ? String(value) : ''}
+            onChange={(val) => handleFieldChange(field.fieldKey, val)}
+            placeholder={field.placeholder || `Select ${field.fieldLabel}...`}
+            error={error}
+          />
         );
 
       case 'CHECKBOX':

@@ -17,6 +17,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { FormDrawer, FormSection, DetailDrawer, StatusBadge } from '@/components/enterprise';
 
 export interface DocumentConfig {
@@ -373,35 +374,35 @@ export const DocumentNumberingScreen: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-                Date Segment
-              </label>
-              <select
+              <UniversalSelect
+                label="Date Segment"
+                size="sm"
                 value={editDateFormat}
-                onChange={(e) => setEditDateFormat(e.target.value)}
-                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none font-medium"
-              >
-                <option value="yyyyMMdd">yyyyMMdd (e.g. 20261119)</option>
-                <option value="yyyyMM">yyyyMM (e.g. 202611)</option>
-                <option value="yyyy">yyyy (e.g. 2026)</option>
-                <option value="NONE">NONE (Sequential only)</option>
-              </select>
+                onChange={(val) => setEditDateFormat(val || 'yyyyMMdd')}
+                options={[
+                  { value: 'yyyyMMdd', label: 'yyyyMMdd (e.g. 20261119)', badge: 'DAY' },
+                  { value: 'yyyyMM', label: 'yyyyMM (e.g. 202611)', badge: 'MO' },
+                  { value: 'yyyy', label: 'yyyy (e.g. 2026)', badge: 'YR' },
+                  { value: 'NONE', label: 'NONE (Sequential only)', badge: 'SEQ' },
+                ]}
+                clearable={false}
+              />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-                Reset Period
-              </label>
-              <select
+              <UniversalSelect
+                label="Reset Period"
+                size="sm"
                 value={editResetFrequency}
-                onChange={(e) => setEditResetFrequency(e.target.value)}
-                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none font-medium"
-              >
-                <option value="DAILY">Daily (Midnight)</option>
-                <option value="MONTHLY">Monthly (1st of Month)</option>
-                <option value="YEARLY">Yearly (Jan 1st)</option>
-                <option value="NEVER">Never (Perpetual)</option>
-              </select>
+                onChange={(val) => setEditResetFrequency(val || 'DAILY')}
+                options={[
+                  { value: 'DAILY', label: 'Daily (Midnight)', badge: 'DAY' },
+                  { value: 'MONTHLY', label: 'Monthly (1st of Month)', badge: 'MO' },
+                  { value: 'YEARLY', label: 'Yearly (Jan 1st)', badge: 'YR' },
+                  { value: 'NEVER', label: 'Never (Perpetual)', badge: 'NEV' },
+                ]}
+                clearable={false}
+              />
             </div>
           </FormSection>
 

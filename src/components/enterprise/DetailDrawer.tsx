@@ -56,7 +56,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+      style={{ zIndex: 1000 }}
+      className="fixed inset-0 z-[1000] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div

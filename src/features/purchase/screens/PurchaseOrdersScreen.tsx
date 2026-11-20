@@ -9,6 +9,7 @@ import {
   VendorDto,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -328,21 +329,21 @@ export const PurchaseOrdersScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Approved Supplier *
-            </label>
-            <select
-              value={vendorId}
-              onChange={(e) => setVendorId(Number(e.target.value))}
+            <UniversalSelect
+              label="Approved Supplier"
               required
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              {vendors.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.vendorName} ({v.vendorCode})
-                </option>
-              ))}
-            </select>
+              size="sm"
+              value={vendorId}
+              onChange={(val) => setVendorId(Number(val))}
+              masterType="VENDOR"
+              options={vendors.map((v) => ({
+                value: v.id,
+                label: `${v.vendorName} (${v.vendorCode})`,
+                badge: v.vendorCode,
+              }))}
+              placeholder="Search or select vendor..."
+              clearable={false}
+            />
           </div>
 
           <div>

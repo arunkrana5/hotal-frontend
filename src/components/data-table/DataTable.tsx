@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 
 export interface DataTableProps<TData> {
   data: TData[];
@@ -354,18 +355,19 @@ export function DataTable<TData>({
           </span>
 
           <div className="flex items-center space-x-1 pl-3 border-l border-brand-border dark:border-brand-darkBorder">
-            <span className="text-[11px]">Rows:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-7 text-xs px-2 rounded border border-brand-border bg-brand-surface dark:bg-brand-darkCard dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <span className="text-[11px] whitespace-nowrap">Rows:</span>
+            <div className="w-16">
+              <UniversalSelect
+                options={pageSizeOptions.map((opt) => ({ value: String(opt), label: String(opt) }))}
+                value={String(pageSize)}
+                onChange={(val) => onPageSizeChange(Number(val))}
+                isSearchable={false}
+                clearable={false}
+                placeholder=""
+                size="sm"
+                className="h-7 text-xs"
+              />
+            </div>
           </div>
         </div>
 

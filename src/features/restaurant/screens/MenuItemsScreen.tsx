@@ -3,6 +3,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { api } from '@/services/api';
 import { MenuItemDto } from '@/types/operations';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -345,34 +346,35 @@ export const MenuItemsScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Menu Category *
-            </label>
-            <select
+            <UniversalSelect
+              label="Menu Category"
+              required
+              size="sm"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="MAINS">Main Courses</option>
-              <option value="APPETIZERS">Appetizers &amp; Starters</option>
-              <option value="DESSERTS">Desserts</option>
-              <option value="BEVERAGES">Beverages &amp; Cocktails</option>
-            </select>
+              onChange={(val) => setCategory(val || 'MAINS')}
+              options={[
+                { value: 'MAINS', label: 'Main Courses', badge: 'MAIN' },
+                { value: 'APPETIZERS', label: 'Appetizers & Starters', badge: 'APP' },
+                { value: 'DESSERTS', label: 'Desserts', badge: 'DST' },
+                { value: 'BEVERAGES', label: 'Beverages & Cocktails', badge: 'BEV' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Dietary Specification
-            </label>
-            <select
+            <UniversalSelect
+              label="Dietary Specification"
+              size="sm"
               value={dietaryType}
-              onChange={(e) => setDietaryType(e.target.value)}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="VEG">Vegetarian</option>
-              <option value="NON_VEG">Non-Vegetarian</option>
-              <option value="VEGAN">Strictly Vegan</option>
-            </select>
+              onChange={(val) => setDietaryType(val || 'NON_VEG')}
+              options={[
+                { value: 'VEG', label: 'Vegetarian', badge: 'VEG' },
+                { value: 'NON_VEG', label: 'Non-Vegetarian', badge: 'NV' },
+                { value: 'VEGAN', label: 'Strictly Vegan', badge: 'VGN' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div className="sm:col-span-2">

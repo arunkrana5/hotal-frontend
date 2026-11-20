@@ -12,6 +12,7 @@ import { PagedResult } from '@/types/common';
 import { Card, Badge, StatCard } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageActions } from '@/components/layout/PageToolbar';
@@ -626,17 +627,22 @@ export const DashboardScreen: React.FC = () => {
               </div>
 
               {/* Status Filter */}
-              <select
-                value={selectedRoomStatus}
-                onChange={(e) => setSelectedRoomStatus(e.target.value)}
-                className="text-xs bg-brand-secondarySurface dark:bg-brand-darkCard border border-brand-border dark:border-brand-darkBorder rounded-lg px-2.5 py-1 text-brand-text font-medium focus:outline-none"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="AVAILABLE">Available / Clean</option>
-                <option value="OCCUPIED">Occupied</option>
-                <option value="DIRTY">Needs Turndown</option>
-                <option value="MAINTENANCE">Out of Order</option>
-              </select>
+              <div className="w-36 sm:w-44">
+                <UniversalSelect
+                  size="sm"
+                  value={selectedRoomStatus}
+                  onChange={(val) => setSelectedRoomStatus(val || 'ALL')}
+                  options={[
+                    { value: 'ALL', label: 'All Statuses' },
+                    { value: 'AVAILABLE', label: 'Available / Clean', badge: 'CLN' },
+                    { value: 'OCCUPIED', label: 'Occupied', badge: 'OCC' },
+                    { value: 'DIRTY', label: 'Needs Turndown', badge: 'DRT' },
+                    { value: 'MAINTENANCE', label: 'Out of Order', badge: 'OOD' },
+                  ]}
+                  placeholder="All Statuses"
+                  clearable={false}
+                />
+              </div>
             </div>
           </div>
 

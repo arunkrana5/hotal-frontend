@@ -16,8 +16,11 @@ const AppContent: React.FC = () => {
         position="top-right"
         closeButton
         richColors
+        style={{ zIndex: 9999 }}
+        className="!z-[9999]"
         toastOptions={{
-          className: 'text-xs rounded-xl shadow-xl font-sans',
+          className: 'text-xs rounded-xl shadow-xl font-sans !z-[9999]',
+          style: { zIndex: 9999 },
         }}
       />
       <ConfirmProvider>

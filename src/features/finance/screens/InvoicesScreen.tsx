@@ -8,6 +8,7 @@ import {
   RecordInvoicePaymentRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -367,18 +368,19 @@ export const InvoicesScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Invoice Category *
-            </label>
-            <select
+            <UniversalSelect
+              label="Invoice Category"
+              required
+              size="sm"
               value={newInvoice.invoiceType}
-              onChange={(e) => setNewInvoice({ ...newInvoice, invoiceType: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="GUEST">Guest Billing</option>
-              <option value="VENDOR">Vendor Payable</option>
-              <option value="CORPORATE">Corporate Direct Bill</option>
-            </select>
+              onChange={(val) => setNewInvoice({ ...newInvoice, invoiceType: val || 'GUEST' })}
+              options={[
+                { value: 'GUEST', label: 'Guest Billing', badge: 'GST' },
+                { value: 'VENDOR', label: 'Vendor Payable', badge: 'VND' },
+                { value: 'CORPORATE', label: 'Corporate Direct Bill', badge: 'CORP' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div className="sm:col-span-2">
@@ -489,19 +491,21 @@ export const InvoicesScreen: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-                Payment Method *
-              </label>
-              <select
+              <UniversalSelect
+                label="Payment Method"
+                required
+                size="sm"
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-              >
-                <option value="CREDIT_CARD">Credit / Debit Card</option>
-                <option value="BANK_TRANSFER">Direct Bank Transfer</option>
-                <option value="CASH">Cash Drawer</option>
-                <option value="ROOM_FOLIO">Charge to Guest Folio</option>
-              </select>
+                onChange={(val) => setPaymentMethod(val || 'CREDIT_CARD')}
+                masterType="PAYMENT_METHOD"
+                options={[
+                  { value: 'CREDIT_CARD', label: 'Credit / Debit Card', badge: 'CC' },
+                  { value: 'BANK_TRANSFER', label: 'Direct Bank Transfer', badge: 'WIRE' },
+                  { value: 'CASH', label: 'Cash Drawer', badge: 'CSH' },
+                  { value: 'ROOM_FOLIO', label: 'Charge to Guest Folio', badge: 'FOLIO' },
+                ]}
+                clearable={false}
+              />
             </div>
 
             <div className="sm:col-span-2">

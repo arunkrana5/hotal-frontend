@@ -7,6 +7,7 @@ import {
   CheckInVisitorRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -357,21 +358,23 @@ export const VisitorLogScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Visiting Department *
-            </label>
-            <select
+            <UniversalSelect
+              label="Visiting Department"
+              required
+              size="sm"
               value={newVisitor.visitingDepartment}
-              onChange={(e) => setNewVisitor({ ...newVisitor, visitingDepartment: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="FO">Front Office / Executive</option>
-              <option value="ENG">Engineering / Facilities</option>
-              <option value="FB">Kitchen &amp; Banquet</option>
-              <option value="HK">Housekeeping Stores</option>
-              <option value="HR">Human Resources</option>
-              <option value="IT">Server Room &amp; IT</option>
-            </select>
+              onChange={(val) => setNewVisitor({ ...newVisitor, visitingDepartment: val || 'FO' })}
+              masterType="DEPARTMENT"
+              options={[
+                { value: 'FO', label: 'Front Office / Executive', badge: 'FO' },
+                { value: 'ENG', label: 'Engineering / Facilities', badge: 'ENG' },
+                { value: 'FB', label: 'Kitchen & Banquet', badge: 'FB' },
+                { value: 'HK', label: 'Housekeeping Stores', badge: 'HK' },
+                { value: 'HR', label: 'Human Resources', badge: 'HR' },
+                { value: 'IT', label: 'Server Room & IT', badge: 'IT' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div className="sm:col-span-2">

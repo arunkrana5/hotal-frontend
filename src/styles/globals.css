@@ -131,3 +131,18 @@ button.btn svg,
   vertical-align: middle;
   flex-shrink: 0;
 }
+
+/* Centralized Overlay Stacking & Global Toast Priority (Section 3) */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+[data-sonner-toast] {
+  z-index: 9999 !important;
+}
+
+#hotelos-overlay-root {
+  position: relative;
+  z-index: 2000;
+}

@@ -8,6 +8,7 @@ import {
   AssetDto,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -337,37 +338,40 @@ export const WorkOrdersScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Priority Level *
-            </label>
-            <select
+            <UniversalSelect
+              label="Priority Level"
+              required
+              size="sm"
               value={newOrder.priority}
-              onChange={(e) => setNewOrder({ ...newOrder, priority: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="URGENT">Urgent (Guest Impact / Safety)</option>
-              <option value="HIGH">High Priority</option>
-              <option value="MEDIUM">Medium (Routine)</option>
-              <option value="LOW">Low</option>
-            </select>
+              onChange={(val) => setNewOrder({ ...newOrder, priority: val || 'MEDIUM' })}
+              masterType="TASK_PRIORITY"
+              options={[
+                { value: 'URGENT', label: 'Urgent (Guest Impact / Safety)', badge: 'URG' },
+                { value: 'HIGH', label: 'High Priority', badge: 'HI' },
+                { value: 'MEDIUM', label: 'Medium (Routine)', badge: 'MED' },
+                { value: 'LOW', label: 'Low', badge: 'LOW' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Asset / Machinery Register
-            </label>
-            <select
+            <UniversalSelect
+              label="Asset / Machinery Register"
+              size="sm"
               value={newOrder.assetId || ''}
-              onChange={(e) => setNewOrder({ ...newOrder, assetId: e.target.value ? Number(e.target.value) : undefined })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="">General Facility / Non-Asset Issue</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.assetName} ({a.assetCode}) - {a.location}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setNewOrder({ ...newOrder, assetId: val ? Number(val) : undefined })}
+              options={[
+                { value: '', label: 'General Facility / Non-Asset Issue' },
+                ...assets.map((a) => ({
+                  value: a.id,
+                  label: `${a.assetName} (${a.assetCode}) - ${a.location}`,
+                  badge: a.assetCode,
+                })),
+              ]}
+              placeholder="Select asset or general facility..."
+              clearable={true}
+            />
           </div>
 
           <div className="sm:col-span-2">

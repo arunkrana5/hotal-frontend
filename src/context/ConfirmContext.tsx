@@ -193,7 +193,8 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/60 backdrop-blur-sm animate-in fade-in duration-150"
+          style={{ zIndex: 1100 }}
+          className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-navy-950/60 backdrop-blur-sm animate-in fade-in duration-150"
           onKeyDown={(e) => {
             if (e.key === 'Escape' && !isLoading) handleClose();
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleExecuteConfirm();

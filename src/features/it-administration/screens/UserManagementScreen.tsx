@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ListToolbar } from '@/components/enterprise/ListToolbar';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { api } from '@/services/api';
 import {
   Users,
@@ -281,51 +283,52 @@ export const UserManagementScreen: React.FC = () => {
       {/* 2. TAB: USERS DIRECTORY */}
       {activeTab === 'users' && (
         <div className="space-y-3">
-          {/* Filters Bar */}
-          <div className="bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-xl p-3 shadow-soft-xs flex flex-wrap items-center justify-between gap-3">
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[240px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by username, email or name..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-navy-950 border border-brand-border dark:border-brand-darkBorder rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary"
-              />
-            </form>
-
-            <div className="flex items-center space-x-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+          {/* Universal List Toolbar */}
+          <ListToolbar
+            searchQuery={searchQuery}
+            onSearchChange={(q) => {
+              setSearchQuery(q);
+              setPage(1);
+            }}
+            searchPlaceholder="Search by username, email or name..."
+            filters={[
+              {
+                id: 'status',
+                value: statusFilter,
+                onChange: (val) => {
+                  setStatusFilter(val || '');
                   setPage(1);
-                }}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950 text-slate-700 dark:text-slate-200"
-              >
-                <option value="">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Locked">Locked</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-
-              <select
-                value={roleFilter}
-                onChange={(e) => {
-                  setRoleFilter(e.target.value);
+                },
+                placeholder: 'All Statuses',
+                options: [
+                  { value: '', label: 'All Statuses' },
+                  { value: 'Active', label: 'Active', badge: 'ACT' },
+                  { value: 'Locked', label: 'Locked', badge: 'LCK' },
+                  { value: 'Inactive', label: 'Inactive', badge: 'INA' },
+                ],
+              },
+              {
+                id: 'role',
+                value: roleFilter,
+                onChange: (val) => {
+                  setRoleFilter(val || '');
                   setPage(1);
-                }}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950 text-slate-700 dark:text-slate-200"
-              >
-                <option value="">All Roles</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.name}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                },
+                placeholder: 'All Roles',
+                options: [
+                  { value: '', label: 'All Roles' },
+                  ...roles.map((r) => ({ value: r.name, label: r.name })),
+                ],
+              },
+            ]}
+            onResetFilters={() => {
+              setStatusFilter('');
+              setRoleFilter('');
+              setSearchQuery('');
+              setPage(1);
+            }}
+            isFiltered={!!statusFilter || !!roleFilter || !!searchQuery}
+          />
 
           {/* Users DataTable */}
           <div className="bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-xl overflow-hidden shadow-soft-xs">
@@ -560,21 +563,21 @@ export const UserManagementScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Assign Role</label>
-                <select
-                  onChange={(e) => {
-                    const id = parseInt(e.target.value);
+                <UniversalSelect
+                  label="Assign Primary Role"
+                  size="sm"
+                  value={formData.selectedRoleIds[0] || ''}
+                  onChange={(val) => {
+                    const id = Number(val);
                     if (id) setFormData({ ...formData, selectedRoleIds: [id] });
                   }}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                >
-                  <option value="">Select Primary Role</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+                  options={roles.map((r) => ({
+                    value: r.id,
+                    label: r.name,
+                  }))}
+                  placeholder="Select Primary Role..."
+                  clearable={false}
+                />
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-2 border-t border-brand-border dark:border-brand-darkBorder">

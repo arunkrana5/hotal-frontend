@@ -9,6 +9,7 @@ import {
   CreateJournalLineRequest,
 } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -498,17 +499,19 @@ export const GeneralLedgerScreen: React.FC = () => {
                 className="p-2.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface grid grid-cols-12 gap-2 items-center text-xs"
               >
                 <div className="col-span-5">
-                  <select
+                  <UniversalSelect
+                    size="sm"
                     value={line.accountId}
-                    onChange={(e) => handleLineChange(idx, 'accountId', Number(e.target.value))}
-                    className="w-full h-7 px-2 text-xs rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
-                  >
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.accountCode} - {a.accountName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleLineChange(idx, 'accountId', Number(val))}
+                    masterType="ACCOUNT"
+                    options={accounts.map((a) => ({
+                      value: a.id,
+                      label: `${a.accountCode} - ${a.accountName}`,
+                      badge: a.accountType,
+                    }))}
+                    placeholder="Select ledger account..."
+                    clearable={false}
+                  />
                 </div>
 
                 <div className="col-span-3">

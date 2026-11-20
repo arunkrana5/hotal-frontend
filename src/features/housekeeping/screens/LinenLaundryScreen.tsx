@@ -9,6 +9,7 @@ import {
 } from '@/types/operations';
 import { RoomDto } from '@/types/pms';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -421,21 +422,20 @@ export const LinenLaundryScreen: React.FC = () => {
       >
         <FormSection title="Room Assignment" description="Occupied room and priority">
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Guest Room *
-            </label>
-            <select
-              value={selectedRoomId}
-              onChange={(e) => setSelectedRoomId(Number(e.target.value))}
+            <UniversalSelect
+              label="Guest Room"
               required
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  Room #{r.roomNumber} - {r.roomTypeCode} (Occupied)
-                </option>
-              ))}
-            </select>
+              size="sm"
+              value={selectedRoomId}
+              onChange={(val) => setSelectedRoomId(Number(val))}
+              options={rooms.map((r) => ({
+                value: r.id,
+                label: `Room #${r.roomNumber} - ${r.roomTypeCode} (Occupied)`,
+                badge: r.roomTypeCode,
+              }))}
+              placeholder="Select guest room..."
+              clearable={false}
+            />
           </div>
 
           <div>
@@ -490,15 +490,17 @@ export const LinenLaundryScreen: React.FC = () => {
                 </div>
 
                 <div className="col-span-3">
-                  <select
+                  <UniversalSelect
+                    size="sm"
                     value={item.serviceType}
-                    onChange={(e) => handleItemChange(idx, 'serviceType', e.target.value)}
-                    className="w-full h-7 px-1.5 text-xs rounded border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkCard text-brand-text focus:outline-none"
-                  >
-                    <option value="WASH_AND_FOLD">Wash &amp; Fold</option>
-                    <option value="DRY_CLEAN">Dry Clean</option>
-                    <option value="PRESS_ONLY">Press Only</option>
-                  </select>
+                    onChange={(val) => handleItemChange(idx, 'serviceType', val || 'WASH_AND_FOLD')}
+                    options={[
+                      { value: 'WASH_AND_FOLD', label: 'Wash & Fold' },
+                      { value: 'DRY_CLEAN', label: 'Dry Clean' },
+                      { value: 'PRESS_ONLY', label: 'Press Only' },
+                    ]}
+                    clearable={false}
+                  />
                 </div>
 
                 <div className="col-span-2">

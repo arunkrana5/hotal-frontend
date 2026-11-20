@@ -4,6 +4,7 @@ import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import { EmployeeDto, CreateEmployeeRequest } from '@/types/erp';
 import { Button } from '@/components/common/Button';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
@@ -325,23 +326,25 @@ export const StaffDirectoryScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Department *
-            </label>
-            <select
+            <UniversalSelect
+              label="Department"
+              required
+              size="sm"
               value={newEmployee.departmentCode}
-              onChange={(e) => setNewEmployee({ ...newEmployee, departmentCode: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="FO">Front Office</option>
-              <option value="HK">Housekeeping</option>
-              <option value="FB">Food &amp; Beverage</option>
-              <option value="KIT">Kitchen</option>
-              <option value="ENG">Engineering &amp; Maintenance</option>
-              <option value="SEC">Security</option>
-              <option value="FIN">Finance</option>
-              <option value="IT">IT Department</option>
-            </select>
+              onChange={(val) => setNewEmployee({ ...newEmployee, departmentCode: val || 'FO' })}
+              masterType="DEPARTMENT"
+              options={[
+                { value: 'FO', label: 'Front Office', badge: 'FO' },
+                { value: 'HK', label: 'Housekeeping', badge: 'HK' },
+                { value: 'FB', label: 'Food & Beverage', badge: 'FB' },
+                { value: 'KIT', label: 'Kitchen', badge: 'KIT' },
+                { value: 'ENG', label: 'Engineering & Maintenance', badge: 'ENG' },
+                { value: 'SEC', label: 'Security', badge: 'SEC' },
+                { value: 'FIN', label: 'Finance', badge: 'FIN' },
+                { value: 'IT', label: 'IT Department', badge: 'IT' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
@@ -401,19 +404,19 @@ export const StaffDirectoryScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Employment Classification
-            </label>
-            <select
+            <UniversalSelect
+              label="Employment Classification"
+              size="sm"
               value={newEmployee.employmentType}
-              onChange={(e) => setNewEmployee({ ...newEmployee, employmentType: e.target.value })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            >
-              <option value="FULL_TIME">Full-Time Staff</option>
-              <option value="PART_TIME">Part-Time</option>
-              <option value="CONTRACT">Contractor</option>
-              <option value="SEASONAL">Seasonal Peak Worker</option>
-            </select>
+              onChange={(val) => setNewEmployee({ ...newEmployee, employmentType: val || 'FULL_TIME' })}
+              options={[
+                { value: 'FULL_TIME', label: 'Full-Time Staff', badge: 'FT' },
+                { value: 'PART_TIME', label: 'Part-Time Staff', badge: 'PT' },
+                { value: 'CONTRACT', label: 'Contractor', badge: 'CON' },
+                { value: 'SEASONAL', label: 'Seasonal Peak Worker', badge: 'SEA' },
+              ]}
+              clearable={false}
+            />
           </div>
 
           <div>
