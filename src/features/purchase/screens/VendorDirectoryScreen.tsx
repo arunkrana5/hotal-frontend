@@ -7,7 +7,6 @@ import { Button } from '@/components/common/Button';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -224,16 +223,7 @@ export const VendorDirectoryScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search vendor by name, code, contact person..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Data Table */}
+      {/* 3. Data Table with Unified Top Toolbar */}
       <DataTable
         data={vendors}
         columns={columns}
@@ -243,8 +233,14 @@ export const VendorDirectoryScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={loading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search vendor by name, code, contact person..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="vendor_directory.csv"
       />
 
       {/* 5. Create Supplier Drawer */}

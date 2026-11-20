@@ -10,7 +10,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -239,16 +238,7 @@ export const DeparturesScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search departing guest, room #, booking #..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Data Table */}
+      {/* 3. Data Table with Unified Top Toolbar */}
       <DataTable
         data={filteredDepartures}
         columns={columns}
@@ -258,8 +248,14 @@ export const DeparturesScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={isLoading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search departing guest, room #, booking #..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="departures_manifest.csv"
       />
 
       {/* 5. Checkout Drawer */}

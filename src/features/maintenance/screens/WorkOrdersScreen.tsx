@@ -12,7 +12,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -265,8 +264,16 @@ export const WorkOrdersScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={orders}
+        columns={columns}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={setPageIndex}
+        onPageSizeChange={setPageSize}
+        isLoading={loading}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search WO #, asset name, issue description..."
@@ -290,20 +297,9 @@ export const WorkOrdersScreen: React.FC = () => {
           setPriorityFilter('ALL');
         }}
         isFiltered={search !== '' || priorityFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={orders}
-        columns={columns}
-        totalCount={totalCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={setPageIndex}
-        onPageSizeChange={setPageSize}
-        isLoading={loading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="work_orders.csv"
       />
 
       {/* 5. Create Work Order Drawer */}

@@ -12,7 +12,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -309,16 +308,7 @@ export const InventoryItemsScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search SKU code, name, storage bin..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Data Table */}
+      {/* 3. Data Table with Unified Top Toolbar */}
       <DataTable
         data={filteredItems}
         columns={columns}
@@ -328,8 +318,14 @@ export const InventoryItemsScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={loading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search SKU code, name, storage bin..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="inventory_items.csv"
       />
 
       {/* 5. Create SKU Drawer */}

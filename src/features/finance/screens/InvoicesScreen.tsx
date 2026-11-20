@@ -12,7 +12,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -296,8 +295,16 @@ export const InvoicesScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={invoices}
+        columns={columns}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={setPageIndex}
+        onPageSizeChange={setPageSize}
+        isLoading={loading}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search invoice #, client, vendor..."
@@ -320,20 +327,9 @@ export const InvoicesScreen: React.FC = () => {
           setTypeFilter('ALL');
         }}
         isFiltered={search !== '' || typeFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={invoices}
-        columns={columns}
-        totalCount={totalCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={setPageIndex}
-        onPageSizeChange={setPageSize}
-        isLoading={loading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="invoices_register.csv"
       />
 
       {/* 5. Create Invoice Drawer */}

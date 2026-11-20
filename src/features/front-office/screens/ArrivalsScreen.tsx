@@ -9,7 +9,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -254,16 +253,7 @@ export const ArrivalsScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search arriving guest, booking #..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Data Table */}
+      {/* 3. Data Table with Unified Top Toolbar */}
       <DataTable
         data={filteredArrivals}
         columns={columns}
@@ -273,8 +263,14 @@ export const ArrivalsScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={isLoading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search arriving guest, booking #..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="arrivals_manifest.csv"
       />
 
       {/* 5. Check-In Drawer */}

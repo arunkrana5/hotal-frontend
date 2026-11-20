@@ -322,29 +322,9 @@ export const PurchaseRequisitionsScreen: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Requisition Statuses</option>
-            <option value="SUBMITTED">Pending Approval</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="CONVERTED_TO_PO">Converted to PO</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Requisitions DataTable */}
+      {/* Requisitions DataTable with Integrated Filter & Toolbar */}
       <DataTable<PurchaseRequisitionDto>
         title="Purchase Requisition Manifest"
-        subtitle="Departmental purchase orders undergoing workflow evaluation and vendor allocation"
         data={requisitions}
         columns={columns}
         totalCount={totalCount}
@@ -355,6 +335,25 @@ export const PurchaseRequisitionsScreen: React.FC = () => {
         onPageSizeChange={setPageSize}
         onRefresh={fetchRequisitions}
         exportFileName="purchase_requisitions.csv"
+        filters={[
+          {
+            id: 'status',
+            label: 'Requisition Status',
+            value: statusFilter,
+            options: [
+              { label: 'All Requisition Statuses', value: '' },
+              { label: 'Pending Approval', value: 'SUBMITTED' },
+              { label: 'Approved', value: 'APPROVED' },
+              { label: 'Rejected', value: 'REJECTED' },
+              { label: 'Converted to PO', value: 'CONVERTED_TO_PO' },
+            ],
+            onChange: (val) => {
+              setStatusFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-48',
+          },
+        ]}
       />
 
       {/* New Requisition Modal */}

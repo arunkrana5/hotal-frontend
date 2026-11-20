@@ -7,7 +7,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -258,8 +257,15 @@ export const MenuItemsScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={filteredItems}
+        columns={columns}
+        totalCount={filteredItems.length}
+        pageIndex={0}
+        pageSize={50}
+        onPageChange={() => {}}
+        onPageSizeChange={() => {}}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search dish by name, item code..."
@@ -282,20 +288,10 @@ export const MenuItemsScreen: React.FC = () => {
           setDietaryFilter('ALL');
         }}
         isFiltered={search !== '' || dietaryFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={filteredItems}
-        columns={columns}
-        totalCount={filteredItems.length}
-        pageIndex={0}
-        pageSize={50}
-        onPageChange={() => {}}
-        onPageSizeChange={() => {}}
         isLoading={loading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="restaurant_menu.csv"
       />
 
       {/* 5. Create Dish Drawer */}

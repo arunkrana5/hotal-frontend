@@ -9,7 +9,6 @@ import { Button } from '@/components/common/Button';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   DetailDrawer,
@@ -239,8 +238,16 @@ export const ReservationListScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. Single-Row Filter Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={reservations}
+        columns={columns}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={setPageIndex}
+        onPageSizeChange={setPageSize}
+        isLoading={isLoading}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search confirmation #, guest name, phone..."
@@ -264,20 +271,9 @@ export const ReservationListScreen: React.FC = () => {
           setSourceFilter('ALL');
         }}
         isFiltered={search !== '' || sourceFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={reservations}
-        columns={columns}
-        totalCount={totalCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={setPageIndex}
-        onPageSizeChange={setPageSize}
-        isLoading={isLoading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="reservations_manifest.csv"
       />
 
       {/* 5. Detail Drawer: Comprehensive Booking Inspection */}

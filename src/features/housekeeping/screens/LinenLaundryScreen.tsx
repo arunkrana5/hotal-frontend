@@ -13,7 +13,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -371,16 +370,7 @@ export const LinenLaundryScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder={activeTab === 'LINEN' ? 'Filter linen items...' : 'Search laundry order #, room #...'}
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Main Table */}
+      {/* 3. Main Table with Unified Top Toolbar */}
       {activeTab === 'LINEN' ? (
         <DataTable
           data={linenItems}
@@ -391,8 +381,14 @@ export const LinenLaundryScreen: React.FC = () => {
           onPageChange={() => {}}
           onPageSizeChange={() => {}}
           isLoading={linenLoading}
-          enableSearch={false}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Filter linen items by name, SKU, category..."
+          onResetFilters={() => setSearch('')}
+          isFiltered={search !== ''}
           enableExport={true}
+          enableColumnVisibility={true}
+          exportFileName="linen_inventory.csv"
         />
       ) : (
         <DataTable
@@ -404,8 +400,14 @@ export const LinenLaundryScreen: React.FC = () => {
           onPageChange={setPageIndex}
           onPageSizeChange={setPageSize}
           isLoading={laundryLoading}
-          enableSearch={false}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search laundry order #, room #, guest name..."
+          onResetFilters={() => setSearch('')}
+          isFiltered={search !== ''}
           enableExport={true}
+          enableColumnVisibility={true}
+          exportFileName="guest_laundry_orders.csv"
         />
       )}
 

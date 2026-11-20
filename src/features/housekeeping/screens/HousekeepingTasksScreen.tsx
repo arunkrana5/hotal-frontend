@@ -9,7 +9,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -267,7 +266,16 @@ export const HousekeepingTasksScreen: React.FC = () => {
       />
 
       {/* 3. List Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={tasks}
+        columns={columns}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={setPageIndex}
+        onPageSizeChange={setPageSize}
+        isLoading={loading}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search room #, attendant name..."
@@ -305,20 +313,9 @@ export const HousekeepingTasksScreen: React.FC = () => {
           setTaskTypeFilter('ALL');
         }}
         isFiltered={search !== '' || priorityFilter !== 'ALL' || taskTypeFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={tasks}
-        columns={columns}
-        totalCount={totalCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={setPageIndex}
-        onPageSizeChange={setPageSize}
-        isLoading={loading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="housekeeping_tasks.csv"
       />
 
       {/* 5. Create Task Drawer */}

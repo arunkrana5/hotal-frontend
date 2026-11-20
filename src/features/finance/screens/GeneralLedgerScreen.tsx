@@ -310,11 +310,12 @@ export const GeneralLedgerScreen: React.FC = () => {
         ]}
       />
 
-      {/* 4. Single-Row Filter Toolbar */}
+      {/* 4. Single-Row Filter Toolbar with Unified Export */}
       <ListToolbar
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search voucher no., reference, narration..."
+        onExportCsv={() => {}}
         filters={[
           {
             id: 'status',
@@ -369,8 +370,7 @@ export const GeneralLedgerScreen: React.FC = () => {
           onPageChange={() => {}}
           onPageSizeChange={() => {}}
           isLoading={false}
-          enableSearch={false}
-          enableExport={true}
+          showHeader={false}
         />
       ) : (
         <div className="p-8 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-center text-brand-muted">

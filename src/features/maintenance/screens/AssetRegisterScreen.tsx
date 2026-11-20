@@ -257,29 +257,9 @@ export const AssetRegisterScreen: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Asset Categories</option>
-            <option value="HVAC">HVAC &amp; Chillers</option>
-            <option value="ELECTRICAL">Generators &amp; Transformers</option>
-            <option value="PLUMBING">Boilers &amp; Water Plants</option>
-            <option value="KITCHEN">Commercial Kitchen Ranges</option>
-            <option value="ELEVATOR">Elevators &amp; Escalators</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Assets DataTable */}
+      {/* Assets DataTable with Integrated Filter & Toolbar */}
       <DataTable<AssetDto>
         title="Physical Asset Register"
-        subtitle="Barcoded plant machinery with location tags and preventative maintenance logs"
         data={assets}
         columns={columns}
         totalCount={totalCount}
@@ -288,13 +268,33 @@ export const AssetRegisterScreen: React.FC = () => {
         isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
+        onRefresh={fetchAssets}
+        exportFileName="asset_register.csv"
+        filters={[
+          {
+            id: 'category',
+            label: 'Asset Category',
+            value: categoryFilter,
+            options: [
+              { label: 'All Asset Categories', value: '' },
+              { label: 'HVAC & Chillers', value: 'HVAC' },
+              { label: 'Generators & Transformers', value: 'ELECTRICAL' },
+              { label: 'Boilers & Water Plants', value: 'PLUMBING' },
+              { label: 'Commercial Kitchen Ranges', value: 'KITCHEN' },
+              { label: 'Elevators & Escalators', value: 'ELEVATOR' },
+            ],
+            onChange: (val) => {
+              setCategoryFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-48',
+          },
+        ]}
         onSearchChange={(s) => {
           setSearch(s);
           setPageIndex(0);
         }}
-        onRefresh={fetchAssets}
         searchPlaceholder="Filter assets by tag, name, or serial..."
-        exportFileName="asset_register.csv"
       />
 
       {/* Add Asset Modal */}

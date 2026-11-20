@@ -10,7 +10,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -283,16 +282,7 @@ export const GuestDirectoryScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search guest by name, email, phone, passport..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 4. Data Table */}
+      {/* 3. Data Table with Unified Top Toolbar */}
       <DataTable
         data={guests}
         columns={columns}
@@ -302,8 +292,14 @@ export const GuestDirectoryScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={isLoading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search guest by name, email, phone, passport..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="guest_directory.csv"
       />
 
       {/* 5. Register Guest Drawer */}

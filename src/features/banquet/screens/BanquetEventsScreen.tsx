@@ -332,29 +332,9 @@ export const BanquetEventsScreen: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Event Statuses</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="IN_PROGRESS">Live / In Progress</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Bookings DataTable */}
+      {/* Bookings DataTable with Integrated Filter & Toolbar */}
       <DataTable<BanquetBookingDto>
         title="Banquet Event Manifest"
-        subtitle="Comprehensive event registry across ballrooms, outdoor lawns, and conference halls"
         data={bookings}
         columns={columns}
         totalCount={totalCount}
@@ -365,6 +345,25 @@ export const BanquetEventsScreen: React.FC = () => {
         onPageSizeChange={setPageSize}
         onRefresh={fetchBookings}
         exportFileName="banquet_events.csv"
+        filters={[
+          {
+            id: 'status',
+            label: 'Event Status',
+            value: statusFilter,
+            options: [
+              { label: 'All Event Statuses', value: '' },
+              { label: 'Confirmed', value: 'CONFIRMED' },
+              { label: 'Live / In Progress', value: 'IN_PROGRESS' },
+              { label: 'Completed', value: 'COMPLETED' },
+              { label: 'Cancelled', value: 'CANCELLED' },
+            ],
+            onChange: (val) => {
+              setStatusFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-48',
+          },
+        ]}
       />
 
       {/* Create Event Modal */}

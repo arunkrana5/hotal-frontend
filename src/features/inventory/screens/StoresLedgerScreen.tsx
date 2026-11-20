@@ -7,7 +7,6 @@ import { Button } from '@/components/common/Button';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   DetailDrawer,
@@ -210,16 +209,7 @@ export const StoresLedgerScreen: React.FC = () => {
         ]}
       />
 
-      {/* 4. List Toolbar */}
-      <ListToolbar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search tx number, item code, department..."
-        onResetFilters={() => setSearch('')}
-        isFiltered={search !== ''}
-      />
-
-      {/* 5. Data Table */}
+      {/* 4. Data Table with Unified Top Toolbar (Search, Customize Columns & Multi-Format Export) */}
       <DataTable
         data={transactions}
         columns={columns}
@@ -229,8 +219,14 @@ export const StoresLedgerScreen: React.FC = () => {
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
         isLoading={loading}
-        enableSearch={false}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search tx number, item code, department..."
+        onResetFilters={() => setSearch('')}
+        isFiltered={search !== ''}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="central_stores_ledger.csv"
       />
 
       {/* 6. Transaction Detail Drawer */}

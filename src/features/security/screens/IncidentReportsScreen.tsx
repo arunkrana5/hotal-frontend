@@ -285,45 +285,9 @@ export const IncidentReportsScreen: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={severityFilter}
-            onChange={(e) => {
-              setSeverityFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Severities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="CRITICAL">Critical</option>
-          </Select>
-        </div>
-
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="OPEN">Open</option>
-            <option value="IN_INVESTIGATION">In Investigation</option>
-            <option value="RESOLVED">Resolved</option>
-            <option value="CLOSED">Closed</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Incidents DataTable */}
+      {/* Incidents DataTable with Integrated Filter & Toolbar */}
       <DataTable<IncidentReportDto>
-        title="Security &amp; Safety Incident Log"
-        subtitle="Confidential audit trail for hotel safety officers, GM reviews, and insurance reporting"
+        title="Security & Safety Incident Log"
         data={incidents}
         columns={columns}
         totalCount={totalCount}
@@ -334,6 +298,42 @@ export const IncidentReportsScreen: React.FC = () => {
         onPageSizeChange={setPageSize}
         onRefresh={fetchIncidents}
         exportFileName="incident_reports.csv"
+        filters={[
+          {
+            id: 'severity',
+            label: 'Severity',
+            value: severityFilter,
+            options: [
+              { label: 'All Severities', value: '' },
+              { label: 'Low', value: 'LOW' },
+              { label: 'Medium', value: 'MEDIUM' },
+              { label: 'High', value: 'HIGH' },
+              { label: 'Critical', value: 'CRITICAL' },
+            ],
+            onChange: (val) => {
+              setSeverityFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-40',
+          },
+          {
+            id: 'status',
+            label: 'Status',
+            value: statusFilter,
+            options: [
+              { label: 'All Statuses', value: '' },
+              { label: 'Open', value: 'OPEN' },
+              { label: 'In Investigation', value: 'IN_INVESTIGATION' },
+              { label: 'Resolved', value: 'RESOLVED' },
+              { label: 'Closed', value: 'CLOSED' },
+            ],
+            onChange: (val) => {
+              setStatusFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-44',
+          },
+        ]}
       />
 
       {/* Log Incident Modal */}

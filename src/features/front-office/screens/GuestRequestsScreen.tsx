@@ -327,43 +327,9 @@ export const GuestRequestsScreen: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="RESOLVED">Resolved</option>
-          </Select>
-        </div>
-        <div className="w-full sm:w-56">
-          <Select
-            value={departmentFilter}
-            onChange={(e) => {
-              setDepartmentFilter(e.target.value);
-              setPageIndex(0);
-            }}
-          >
-            <option value="">All Departments</option>
-            <option value="HOUSEKEEPING">Housekeeping</option>
-            <option value="MAINTENANCE">Engineering</option>
-            <option value="ROOM_SERVICE">Room Service</option>
-            <option value="FRONT_OFFICE">Front Desk</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* DataTable */}
+      {/* DataTable with Integrated Toolbar & Filters */}
       <DataTable<GuestServiceRequestDto>
         title="Active Service Requests"
-        subtitle="Live guest service tickets across all guest rooms and concierge points"
         data={requests}
         columns={columns}
         totalCount={totalCount}
@@ -374,6 +340,41 @@ export const GuestRequestsScreen: React.FC = () => {
         onPageSizeChange={setPageSize}
         onRefresh={fetchRequests}
         exportFileName="guest_requests.csv"
+        filters={[
+          {
+            id: 'status',
+            label: 'Status',
+            value: statusFilter,
+            options: [
+              { label: 'All Statuses', value: '' },
+              { label: 'Pending', value: 'PENDING' },
+              { label: 'In Progress', value: 'IN_PROGRESS' },
+              { label: 'Resolved', value: 'RESOLVED' },
+            ],
+            onChange: (val) => {
+              setStatusFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-40',
+          },
+          {
+            id: 'dept',
+            label: 'Department',
+            value: departmentFilter,
+            options: [
+              { label: 'All Departments', value: '' },
+              { label: 'Housekeeping', value: 'HOUSEKEEPING' },
+              { label: 'Engineering', value: 'MAINTENANCE' },
+              { label: 'Room Service', value: 'ROOM_SERVICE' },
+              { label: 'Front Desk', value: 'FRONT_OFFICE' },
+            ],
+            onChange: (val) => {
+              setDepartmentFilter(val);
+              setPageIndex(0);
+            },
+            width: 'w-44',
+          },
+        ]}
       />
 
       {/* Log Request Modal */}

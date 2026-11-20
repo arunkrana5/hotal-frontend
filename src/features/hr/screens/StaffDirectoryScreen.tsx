@@ -8,7 +8,6 @@ import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
 import {
   PageTabs,
-  ListToolbar,
   RowActions,
   StatusBadge,
   FormDrawer,
@@ -246,8 +245,16 @@ export const StaffDirectoryScreen: React.FC = () => {
         ]}
       />
 
-      {/* 3. List Toolbar */}
-      <ListToolbar
+      {/* 3. Data Table with Integrated Toolbar & Filters */}
+      <DataTable
+        data={employees}
+        columns={columns}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={setPageIndex}
+        onPageSizeChange={setPageSize}
+        isLoading={loading}
         searchQuery={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search staff by name, code, designation..."
@@ -276,20 +283,9 @@ export const StaffDirectoryScreen: React.FC = () => {
           setDepartmentFilter('ALL');
         }}
         isFiltered={search !== '' || departmentFilter !== 'ALL'}
-      />
-
-      {/* 4. Data Table */}
-      <DataTable
-        data={employees}
-        columns={columns}
-        totalCount={totalCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={setPageIndex}
-        onPageSizeChange={setPageSize}
-        isLoading={loading}
-        enableSearch={false}
         enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="staff_directory.csv"
       />
 
       {/* 5. Onboard Employee Drawer */}

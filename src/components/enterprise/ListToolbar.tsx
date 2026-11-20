@@ -36,6 +36,7 @@ export interface ListToolbarProps {
   actions?: React.ReactNode;
   className?: string;
   advancedFilterContent?: React.ReactNode;
+  enableExport?: boolean;
 }
 
 /**
@@ -67,6 +68,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
   actions,
   className,
   advancedFilterContent,
+  enableExport = true,
 }) => {
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -217,7 +219,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
           )}
 
           {/* Unified Export Menu */}
-          {(onExportCsv || onExportExcel || onExportPdf || onExport) && (
+          {enableExport && (
             <ExportMenu
               onExportCsv={onExportCsv || onExport}
               onExportExcel={onExportExcel}
