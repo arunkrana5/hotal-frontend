@@ -7,92 +7,62 @@ import {
   User,
   Eye,
   EyeOff,
-  KeyRound,
-  ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
   Building2,
-  Award,
-  Globe2,
   AlertTriangle,
   ArrowRight,
-  Fingerprint,
+  KeyRound,
 } from 'lucide-react';
 
-interface LuxuryScene {
+interface SlideItem {
   id: string;
-  title: string;
-  headline: string;
-  description: string;
-  category: string;
-  metric: string;
-  metricLabel: string;
   image: string;
+  title: string;
 }
 
-const LUXURY_SCENES: LuxuryScene[] = [
+const CAROUSEL_SLIDES: SlideItem[] = [
   {
     id: 'atrium',
-    title: 'Grand Atrium & Reception',
-    headline: 'Hospitality, Elevated.',
-    description:
-      'Where architectural 5-star elegance meets intelligent enterprise property operations.',
-    category: 'ARCHITECTURAL EXCELLENCE',
-    metric: '99.99%',
-    metricLabel: 'Enterprise Uptime SLA',
     image:
       'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=2000&q=85',
+    title: 'Luxury Reception & Atrium',
   },
   {
     id: 'suite',
-    title: 'The Presidential Sky Suite',
-    headline: 'Unrivaled Guest Journeys.',
-    description:
-      'Hyper-personalized VIP suite automation, instant room turnarounds, and zero-latency concierge.',
-    category: 'PREMIER SUITES',
-    metric: '48+',
-    metricLabel: 'Luxury Properties Live',
     image:
       'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=2000&q=85',
+    title: 'The Presidential Sky Suite',
   },
   {
     id: 'resort',
-    title: 'Horizon Infinity & Dusk Terrace',
-    headline: 'Resort Operations, Synchronized.',
-    description:
-      'Unified cabana management, poolside POS billing, and real-time amenity orchestration.',
-    category: 'RESORT LIVING',
-    metric: '5-Star',
-    metricLabel: 'Global Luxury Standard',
     image:
       'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=2000&q=85',
+    title: 'Horizon Infinity & Dusk Terrace',
   },
   {
     id: 'dining',
-    title: 'Michelin Reserve & Wine Vault',
-    headline: 'Culinary & Beverage Precision.',
-    description:
-      'Live table orchestration, digital sommelier cellar records, and automated inventory sync.',
-    category: 'HAUTE CUISINE',
-    metric: '100%',
-    metricLabel: 'Zero-Trust Financial Isolation',
     image:
       'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=2000&q=85',
-  },
-  {
-    id: 'spa',
-    title: 'The Lotus Spa Sanctuary',
-    headline: 'Holistic Wellness Management.',
-    description:
-      'Seamless therapist scheduling, bespoke treatment billing, and luxury hydrotherapy tracking.',
-    category: 'WELLNESS & SPA',
-    metric: '0-Lag',
-    metricLabel: 'Real-Time Sync Grid',
-    image:
-      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=2000&q=85',
+    title: 'Michelin Reserve & Fine Dining',
   },
 ];
+
+// Carousel motion variants for seamless horizontal slide
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? '100%' : '-100%',
+    opacity: 1,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? '100%' : '-100%',
+    opacity: 0.85,
+  }),
+};
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -107,34 +77,46 @@ export const LoginScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Carousel states
-  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [[slideIndex, direction], setSlide] = useState<[number, number]>([0, 0]);
   const [isPaused, setIsPaused] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Redirect if already authenticated
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Auto-advance carousel
+  // Preload carousel images on mount
+  useEffect(() => {
+    CAROUSEL_SLIDES.forEach((slide) => {
+      const img = new Image();
+      img.src = slide.image;
+    });
+  }, []);
+
+  // Continuous smooth autoplay (7-second interval)
   useEffect(() => {
     if (isPaused) return;
 
-    timerRef.current = setInterval(() => {
-      setCurrentSceneIndex((prev) => (prev + 1) % LUXURY_SCENES.length);
-    }, 6500);
+    const timer = setInterval(() => {
+      setSlide(([curr]) => [(curr + 1) % CAROUSEL_SLIDES.length, 1]);
+    }, 7000);
+
+    const handleVisibilityChange = () => {
+      setIsPaused(document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isPaused, currentSceneIndex]);
+  }, [isPaused]);
 
-  const handleNextScene = () => {
-    setCurrentSceneIndex((prev) => (prev + 1) % LUXURY_SCENES.length);
-  };
-
-  const handlePrevScene = () => {
-    setCurrentSceneIndex((prev) => (prev - 1 + LUXURY_SCENES.length) % LUXURY_SCENES.length);
+  const paginate = (newDirection: number) => {
+    setSlide(([curr]) => {
+      const nextIndex = (curr + newDirection + CAROUSEL_SLIDES.length) % CAROUSEL_SLIDES.length;
+      return [nextIndex, newDirection];
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,11 +124,11 @@ export const LoginScreen: React.FC = () => {
     setError(null);
 
     if (!usernameOrEmail.trim()) {
-      setError('Please provide your operator username or enterprise email.');
+      setError('Please provide your username or email.');
       return;
     }
     if (!password) {
-      setError('Please provide your secret security passphrase.');
+      setError('Please enter your password.');
       return;
     }
 
@@ -162,7 +144,7 @@ export const LoginScreen: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during enterprise authentication.');
+      setError(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -174,231 +156,160 @@ export const LoginScreen: React.FC = () => {
     setError(null);
   };
 
-  const currentScene = LUXURY_SCENES[currentSceneIndex];
+  const activeSlide = CAROUSEL_SLIDES[slideIndex];
 
   return (
     <div className="relative min-h-screen w-full flex bg-[#070b14] text-slate-100 overflow-hidden font-sans selection:bg-amber-500 selection:text-black">
       {/* ========================================================================= */}
-      {/* 1. LEFT CINEMATIC HOSPITALITY EXPERIENCE (60–65% Width Desktop)            */}
+      {/* 1. LEFT CINEMATIC HOSPITALITY EXPERIENCE (~62% Desktop Width)              */}
       {/* ========================================================================= */}
       <div
-        className="relative hidden lg:flex flex-1 flex-col justify-between p-8 xl:p-12 2xl:p-16 overflow-hidden select-none"
+        className="relative hidden lg:flex flex-[1.6] flex-col justify-between p-10 xl:p-14 2xl:p-16 overflow-hidden select-none bg-[#050811]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Animated Background Carousel Images with Ken Burns Zoom & Crossfade */}
+        {/* Continuous Horizontal Sliding Image Carousel */}
         <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-          <AnimatePresence mode="wait">
+          <AnimatePresence initial={false} custom={direction}>
             <motion.div
-              key={currentScene.id}
-              initial={{ opacity: 0, scale: 1.08 }}
-              animate={{ opacity: 1, scale: 1.0 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+              key={activeSlide.id}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: 'tween', ease: [0.25, 1, 0.5, 1], duration: 1.4 },
+                opacity: { duration: 1.4 },
+              }}
               className="absolute inset-0 w-full h-full"
             >
               <img
-                src={currentScene.image}
-                alt={currentScene.title}
-                className="w-full h-full object-cover object-center filter brightness-[0.82] contrast-[1.05]"
+                src={activeSlide.image}
+                alt={activeSlide.title}
+                className="w-full h-full object-cover object-center filter brightness-[0.78] contrast-[1.05]"
               />
             </motion.div>
           </AnimatePresence>
 
-          {/* Cinematic Multi-Layer Gradient Overlays for Supreme Readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-[#070b14]/50 to-transparent opacity-95" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070b14]/75 via-transparent to-[#070b14]/90" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent opacity-60" />
+          {/* Cinematic Dark Gradient Overlays for High Contrast */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-[#070b14]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070b14]/70 via-transparent to-[#070b14]/90" />
         </div>
 
-        {/* Top Brand Bar */}
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            {/* Gold-accented Brand Crest */}
-            <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400/20 via-slate-900 to-amber-600/30 border border-amber-500/40 shadow-xl shadow-amber-950/40 backdrop-blur-md">
-              <Building2 className="w-5 h-5 text-amber-300" />
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping opacity-75" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <span className="font-serif tracking-wider text-xl font-bold text-white drop-shadow-sm">
-                  HOTEL OS
-                </span>
-                <span className="text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 border border-amber-400/30 backdrop-blur-md">
-                  Luxury Edition
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium tracking-wide">
-                Unified Hospitality ERP &amp; Property Management Suite
-              </p>
-            </div>
+        {/* Top: One Brand Identity */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="relative z-10 flex items-center space-x-3"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400/25 via-slate-900 to-amber-600/30 border border-amber-500/40 text-amber-300 shadow-xl shadow-amber-950/40 backdrop-blur-md">
+            <Building2 className="w-5 h-5" />
           </div>
-
-          {/* Core Status Indicator */}
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-950/70 border border-slate-800/80 backdrop-blur-md text-xs text-slate-300 shadow-soft-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-medium tracking-wide">Global Cluster Operational</span>
+          <div>
+            <span className="font-serif tracking-widest text-xl font-bold text-white drop-shadow">
+              HOTEL OS
+            </span>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Center / Lower Content: Scene Typography & Metric Badges */}
-        <div className="relative z-10 space-y-6 max-w-2xl">
-          {/* Animated Category & Headline */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentScene.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-              className="space-y-3"
-            >
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold uppercase tracking-widest backdrop-blur-sm">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>{currentScene.category}</span>
-                <span className="text-slate-500">&bull;</span>
-                <span className="text-slate-300 font-normal">{currentScene.title}</span>
-              </div>
+        {/* Bottom: One Short, Impactful Headline & Minimal Indicators */}
+        <div className="relative z-10 space-y-4 max-w-xl">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+            className="space-y-2"
+          >
+            <h1 className="text-3xl xl:text-4xl 2xl:text-5xl font-serif font-extrabold text-white tracking-tight leading-tight drop-shadow-md">
+              Where Hospitality Meets Intelligence.
+            </h1>
+            <p className="text-sm text-slate-300 font-light tracking-wide">
+              Enterprise PMS &amp; ERP Operations
+            </p>
+          </motion.div>
 
-              <h2 className="text-4xl xl:text-5xl font-serif font-extrabold text-white tracking-tight leading-tight drop-shadow-lg">
-                {currentScene.headline}
-              </h2>
-
-              <p className="text-sm xl:text-base text-slate-300/90 leading-relaxed max-w-xl font-normal drop-shadow">
-                {currentScene.description}
-              </p>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Floating Metric Badges Bar */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 backdrop-blur-md transition-all hover:border-amber-500/40">
-              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold mb-1">
-                <Award className="w-4 h-4 text-amber-400" />
-                <span>5-Star Global</span>
-              </div>
-              <div className="text-[11px] text-slate-400">Forbes Luxury Benchmark</div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 backdrop-blur-md transition-all hover:border-amber-500/40">
-              <div className="flex items-center gap-1.5 text-white font-mono text-sm font-bold mb-1">
-                <Globe2 className="w-4 h-4 text-indigo-400" />
-                <span>48+ Properties</span>
-              </div>
-              <div className="text-[11px] text-slate-400">Active Multi-Property Grid</div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 backdrop-blur-md transition-all hover:border-amber-500/40">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-sm font-bold mb-1">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>99.99% Uptime</span>
-              </div>
-              <div className="text-[11px] text-slate-400">Continuous Operations SLA</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Interactive Navigation & Progress Indicators */}
-        <div className="relative z-10 flex items-center justify-between pt-4 border-t border-white/10">
-          {/* Scene indicators */}
-          <div className="flex items-center space-x-2">
-            {LUXURY_SCENES.map((scene, idx) => {
-              const isActive = idx === currentSceneIndex;
+          {/* Minimal Slide Progress Indicator */}
+          <div className="flex items-center space-x-2 pt-2">
+            {CAROUSEL_SLIDES.map((slide, idx) => {
+              const isActive = idx === slideIndex;
               return (
                 <button
-                  key={scene.id}
-                  onClick={() => setCurrentSceneIndex(idx)}
-                  className={`group relative h-1.5 rounded-full transition-all duration-300 ${
-                    isActive ? 'w-10 bg-gradient-to-r from-amber-400 to-amber-500' : 'w-2 bg-slate-700 hover:bg-slate-500'
+                  key={slide.id}
+                  onClick={() => setSlide([idx, idx > slideIndex ? 1 : -1])}
+                  className={`h-1 rounded-full transition-all duration-500 ${
+                    isActive ? 'w-8 bg-amber-400' : 'w-2 bg-white/20 hover:bg-white/40'
                   }`}
-                  title={scene.title}
-                >
-                  <span className="sr-only">{scene.title}</span>
-                </button>
+                  aria-label={slide.title}
+                />
               );
             })}
-          </div>
-
-          {/* Carousel Arrows */}
-          <div className="flex items-center space-x-1.5">
-            <button
-              onClick={handlePrevScene}
-              className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700 transition"
-              title="Previous Scene"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleNextScene}
-              className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700 transition"
-              title="Next Scene"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. RIGHT LUXURY LOGIN CONSOLE (35–40% Width Desktop, Full on Mobile)      */}
+      {/* 2. RIGHT COMPACT LUXURY LOGIN PANEL (~38% Desktop Width, Full on Mobile)   */}
       {/* ========================================================================= */}
-      <div className="relative w-full lg:w-[460px] xl:w-[500px] 2xl:w-[540px] flex flex-col justify-between p-6 sm:p-10 xl:p-12 bg-[#090e1a]/95 backdrop-blur-2xl border-l border-white/[0.08] shadow-2xl z-20 overflow-y-auto">
-        {/* Subtle Ambient Glowing Orbs */}
-        <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-amber-500/[0.04] blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 left-0 w-80 h-80 rounded-full bg-indigo-500/[0.04] blur-3xl pointer-events-none" />
+      <motion.div
+        initial={{ opacity: 0, x: 25 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+        className="relative w-full lg:w-[420px] xl:w-[460px] 2xl:w-[500px] flex flex-col justify-between p-6 sm:p-10 xl:p-12 bg-[#080d19]/95 backdrop-blur-2xl border-l border-white/[0.08] shadow-2xl z-20 overflow-y-auto"
+      >
+        {/* Subtle Ambient Radial Lighting */}
+        <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-amber-500/[0.04] blur-3xl pointer-events-none" />
 
-        {/* Mobile Header (Visible on smaller viewports) */}
+        {/* Top Spacer / Mobile Brand Bar */}
         <div className="lg:hidden flex items-center justify-between pb-6 border-b border-slate-800/80 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400/20 to-slate-900 border border-amber-500/40 text-amber-300">
-              <Building2 className="w-5 h-5" />
+          <div className="flex items-center space-x-2.5">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
+              <Building2 className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-serif font-bold text-lg text-white">HOTEL OS</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 ml-2">Luxury</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Online</span>
+            <span className="font-serif font-bold text-base text-white tracking-wider">HOTEL OS</span>
           </div>
         </div>
 
-        {/* Main Form Container */}
-        <div className="my-auto py-4">
-          {/* Header & Crest */}
+        {/* Main Content Area */}
+        <div className="my-auto py-2">
+          {/* Brand Mark + Welcome Heading */}
           <div className="mb-7">
-            <div className="hidden lg:inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 via-slate-900 to-amber-600/10 border border-amber-500/30 text-amber-400 mb-4 shadow-lg shadow-amber-950/20">
-              <Fingerprint className="w-6 h-6 text-amber-300" />
+            <div className="hidden lg:inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500/20 via-slate-900 to-amber-600/10 border border-amber-500/30 text-amber-300 mb-4 shadow-lg shadow-amber-950/20">
+              <Building2 className="w-5 h-5" />
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
-              Executive Sign In
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1.5 leading-relaxed">
-              Enter your enterprise operator credentials to access your luxury hospitality management console.
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
+              Sign In
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Enter your enterprise credentials
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Error Banner */}
+            {/* Error Notification */}
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -6 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-200 text-xs flex items-start gap-2.5 backdrop-blur-md"
+                className="p-3 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-200 text-xs flex items-center gap-2"
               >
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span className="flex-1 font-medium">{error}</span>
               </motion.div>
             )}
 
-            {/* Username or Email Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center justify-between">
-                <span>Username or Enterprise Email</span>
-                <span className="text-[10px] text-slate-500 font-normal">Required</span>
+            {/* Username/Email Input */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="space-y-1.5"
+            >
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                Username or Email
               </label>
               <div className="relative group">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-colors">
@@ -406,25 +317,30 @@ export const LoginScreen: React.FC = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="e.g. admin or gm@grandluxuryresort.com"
+                  placeholder="admin or user@hotelos.internal"
                   value={usernameOrEmail}
                   onChange={(e) => setUsernameOrEmail(e.target.value)}
                   disabled={isLoading}
                   autoFocus
-                  className="w-full h-11 pl-10 pr-4 text-xs sm:text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 shadow-inner transition-all disabled:opacity-50"
+                  className="w-full h-10.5 pl-10 pr-4 text-xs sm:text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all disabled:opacity-50"
                 />
               </div>
-            </div>
+            </motion.div>
 
             {/* Password Input */}
-            <div className="space-y-1.5">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="space-y-1.5"
+            >
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Secret Passphrase
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                  Password
                 </label>
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium hover:underline"
+                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -435,98 +351,87 @@ export const LoginScreen: React.FC = () => {
                 </div>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••••••••••"
+                  placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  className="w-full h-11 pl-10 pr-11 text-xs sm:text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 shadow-inner transition-all disabled:opacity-50"
+                  className="w-full h-10.5 pl-10 pr-10 text-xs sm:text-sm rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-all disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                  title={showPassword ? 'Hide passphrase' : 'Show passphrase'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer select-none">
+            {/* Remember Me */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.35 }}
+              className="flex items-center justify-between pt-0.5"
+            >
+              <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 focus:ring-offset-slate-950"
+                  className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 focus:ring-offset-slate-950"
                 />
-                <span className="font-medium text-slate-300">Remember session for 30 days</span>
+                <span>Remember me</span>
               </label>
-            </div>
 
-            {/* Luxury Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="relative group w-full h-11 mt-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:via-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-amber-950/50 hover:shadow-amber-500/20 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all flex items-center justify-center space-x-2 overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {/* Shimmer effect */}
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full duration-1000 bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform" />
-
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Verifying Credentials...</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <span>Sign In to HotelOS</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              )}
-            </button>
-
-            {/* Demo Quick Fill & First Login Option */}
-            <div className="pt-4 mt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-400">
+              {/* Discreet Demo Helper */}
               <button
                 type="button"
                 onClick={handleQuickFillAdmin}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 transition font-medium text-[11px]"
-                title="Populate test administrator credentials"
+                className="text-[11px] text-amber-400/80 hover:text-amber-300 inline-flex items-center gap-1 transition"
+                title="Populate admin credentials"
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Fill Admin Demo Creds</span>
+                <KeyRound className="w-3 h-3" />
+                <span>Demo Admin</span>
               </button>
+            </motion.div>
 
-              <Link
-                to="/first-login"
-                className="text-slate-400 hover:text-slate-200 transition-colors text-[11px] hover:underline"
+            {/* Submit Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="pt-1"
+            >
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="relative group w-full h-10.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-amber-950/40 hover:shadow-amber-500/20 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all flex items-center justify-center space-x-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                First time employee onboarding?
-              </Link>
-            </div>
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <span>Signing In...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                )}
+              </button>
+            </motion.div>
           </form>
         </div>
 
-        {/* Security & Regulatory Footer */}
-        <div className="pt-6 border-t border-slate-800/80 space-y-3">
-          <div className="flex items-center justify-center space-x-3 text-[11px] text-slate-500">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>TLS 1.3 256-Bit</span>
-            </span>
-            <span>&bull;</span>
-            <span>Zero-Trust FIPS 140-2</span>
-            <span>&bull;</span>
-            <span>PCI-DSS Level 1</span>
-          </div>
-
-          <p className="text-center text-[10px] text-slate-600 leading-normal">
-            &copy; {new Date().getFullYear()} HotelOS Inc. All rights reserved. Enterprise Hospitality Operating System.
+        {/* Footer: One Minimal Copyright */}
+        <div className="pt-4 border-t border-slate-800/80 text-center">
+          <p className="text-[11px] text-slate-500">
+            &copy; {new Date().getFullYear()} HotelOS Inc. All rights reserved.
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

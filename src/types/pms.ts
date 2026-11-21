@@ -41,8 +41,10 @@ export interface GuestDto {
   totalStays: number;
   lifetimeSpend: number;
   specialPreferences?: string;
+  address?: string;
   city?: string;
   country?: string;
+  isActive?: boolean;
 }
 
 export interface CreateGuestRequest {
@@ -58,6 +60,112 @@ export interface CreateGuestRequest {
   address?: string;
   city?: string;
   country?: string;
+}
+
+export interface UpdateGuestRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  idDocumentType?: string;
+  idDocumentNumber?: string;
+  nationality?: string;
+  vipStatus?: string;
+  specialPreferences?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  isActive?: boolean;
+}
+
+export interface GuestCrmSummaryDto {
+  totalStays: number;
+  upcomingReservations: number;
+  completedStays: number;
+  totalRevenue: number;
+  outstandingBalance: number;
+  lastStayDate?: string;
+  averageStayDurationNights: number;
+}
+
+export interface GuestStayHistoryDto {
+  reservationId: number;
+  confirmationNumber: string;
+  roomTypeCode: string;
+  roomNumber?: string;
+  checkInDate: string;
+  checkOutDate: string;
+  nights: number;
+  totalAmount: number;
+  status: string;
+}
+
+export interface GuestFolioItemDto {
+  id: number;
+  itemType: string;
+  departmentCode: string;
+  description: string;
+  amount: number;
+  paymentModeCode?: string;
+  transactionReference?: string;
+  postedAt: string;
+}
+
+export interface GuestFolioSummaryDto {
+  folioId: number;
+  folioNumber: string;
+  reservationConfirmation: string;
+  status: string;
+  totalCharges: number;
+  totalPayments: number;
+  balance: number;
+  createdAt: string;
+  items: GuestFolioItemDto[];
+}
+
+export interface GuestAuditEventDto {
+  eventType: string;
+  description: string;
+  timestamp: string;
+  actor: string;
+}
+
+export interface GuestCrmProfileDto {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  idDocumentType?: string;
+  idDocumentNumber?: string;
+  nationality?: string;
+  vipStatus: string;
+  specialPreferences?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  isActive: boolean;
+  createdAt: string;
+  summary: GuestCrmSummaryDto;
+  reservations: ReservationDto[];
+  stayHistory: GuestStayHistoryDto[];
+  folios: GuestFolioSummaryDto[];
+  auditLog: GuestAuditEventDto[];
+}
+
+export interface GuestCrmStatsDto {
+  totalCount: number;
+  activeCount: number;
+  vipCount: number;
+  inactiveCount: number;
+  totalSpend: number;
+  averageSpend: number;
+}
+
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  matchedGuest?: GuestDto;
 }
 
 export interface ReservationDto {

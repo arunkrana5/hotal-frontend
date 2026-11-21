@@ -38,6 +38,7 @@ import { ReservationListScreen } from '@/features/reservations/screens/Reservati
 import { NewReservationScreen } from '@/features/reservations/screens/NewReservationScreen';
 import { AvailabilityMatrixScreen } from '@/features/reservations/screens/AvailabilityMatrixScreen';
 import { GuestDirectoryScreen } from '@/features/guests/screens/GuestDirectoryScreen';
+import { GuestProfileScreen } from '@/features/guests/screens/GuestProfileScreen';
 
 // Common Screens
 import { NotFoundScreen } from '@/features/dashboard/screens/NotFoundScreen';
@@ -111,10 +112,12 @@ export const AppRoutes: React.FC = () => {
           <Route path="/reservations/new" element={<NewReservationScreen />} />
           <Route path="/reservations/matrix" element={<AvailabilityMatrixScreen />} />
 
-          {/* Guests Directory Routes */}
+          {/* Guests Directory & CRM Routes */}
           <Route path="/guests" element={<Navigate to="/guests/list" replace />} />
           <Route path="/guests/list" element={<GuestDirectoryScreen />} />
           <Route path="/guests/loyalty" element={<GuestDirectoryScreen />} />
+          <Route path="/guests/:id" element={<GuestProfileScreen />} />
+          <Route path="/guests/profile/:id" element={<GuestProfileScreen />} />
 
           {/* Housekeeping Routes */}
           <Route path="/housekeeping" element={<Navigate to="/housekeeping/board" replace />} />
