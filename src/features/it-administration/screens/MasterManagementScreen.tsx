@@ -174,10 +174,14 @@ export const MasterManagementScreen: React.FC = () => {
         accessorKey: 'name',
         header: 'Display Label',
         cell: ({ row }) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{row.original.name}</div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+              {row.original.name}
+            </span>
             {row.original.description && (
-              <div className="text-[11px] text-brand-muted truncate max-w-xs">{row.original.description}</div>
+              <span className="text-[11px] text-brand-muted truncate">
+                • {row.original.description}
+              </span>
             )}
           </div>
         ),

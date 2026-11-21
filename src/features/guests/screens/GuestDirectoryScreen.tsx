@@ -358,79 +358,47 @@ export const GuestDirectoryScreen: React.FC = () => {
     }
   };
 
-  // Table Columns
+  // Table Columns - Strict One Record, One Row Standard
   const columns: ColumnDef<GuestDto>[] = useMemo(
     () => [
       {
         accessorKey: 'fullName',
-        header: 'Guest Profile',
+        header: 'Guest',
         cell: ({ row }) => {
           const initials = `${row.original.firstName?.[0] || ''}${row.original.lastName?.[0] || ''}`.toUpperCase();
           return (
             <div
-              className="flex items-center gap-2.5 py-1 cursor-pointer group"
+              className="flex items-center gap-2 py-0.5 cursor-pointer group whitespace-nowrap"
               onClick={() => navigate(`/guests/${row.original.id}`)}
               title="Click to view full CRM profile"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/20 via-slate-800 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-400 group-hover:scale-105 transition-transform shrink-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500/20 via-slate-800 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center text-[11px] font-bold text-amber-400 group-hover:scale-105 transition-transform shrink-0">
                 {initials || 'G'}
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-xs text-brand-text group-hover:text-amber-500 transition-colors">
-                    {row.original.fullName}
-                  </span>
-                  {renderVipBadge(row.original.vipStatus)}
-                </div>
-                <div className="text-[10px] font-mono text-brand-muted">
-                  GST-00{row.original.id}
-                </div>
-              </div>
+              <span className="font-semibold text-xs text-brand-text group-hover:text-amber-500 transition-colors truncate max-w-[160px]">
+                {row.original.fullName}
+              </span>
+              {renderVipBadge(row.original.vipStatus)}
             </div>
           );
         },
       },
       {
-        accessorKey: 'email',
-        header: 'Contact Details',
+        accessorKey: 'id',
+        header: 'Guest ID',
         cell: ({ row }) => (
-          <div className="text-xs space-y-0.5">
-            <div className="text-brand-text flex items-center gap-1.5 truncate max-w-[200px]">
-              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-              <span className="truncate">{row.original.email}</span>
-            </div>
-            <div className="text-brand-muted font-mono flex items-center gap-1.5 text-[11px]">
-              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-              <span>{row.original.phone}</span>
-            </div>
-          </div>
+          <span className="font-mono text-xs text-brand-muted whitespace-nowrap">
+            GST-00{row.original.id}
+          </span>
         ),
       },
       {
-        accessorKey: 'nationality',
-        header: 'Origin & Location',
+        accessorKey: 'phone',
+        header: 'Contact',
         cell: ({ row }) => (
-          <div className="text-xs flex items-center gap-1.5 text-brand-text">
-            <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>
-              {row.original.nationality || 'Unspecified'}
-              {row.original.city && ` • ${row.original.city}`}
-            </span>
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'idDocumentNumber',
-        header: 'Identification',
-        cell: ({ row }) => (
-          <div className="text-xs font-mono">
-            {row.original.idDocumentNumber ? (
-              <span className="text-brand-text bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-brand-border dark:border-brand-darkBorder text-[11px]">
-                {row.original.idDocumentType || 'ID'}: {row.original.idDocumentNumber}
-              </span>
-            ) : (
-              <span className="text-brand-muted italic text-[11px]">Not provided</span>
-            )}
+          <div className="flex items-center gap-1.5 text-xs font-mono text-brand-text whitespace-nowrap">
+            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+            <span>{row.original.phone || row.original.email}</span>
           </div>
         ),
       },
@@ -438,19 +406,19 @@ export const GuestDirectoryScreen: React.FC = () => {
         accessorKey: 'totalStays',
         header: 'Visits',
         cell: ({ row }) => (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 font-mono text-xs font-bold text-brand-text border border-brand-border dark:border-brand-darkBorder">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 font-mono text-xs font-bold text-brand-text border border-brand-border dark:border-brand-darkBorder whitespace-nowrap">
             <Bed className="w-3 h-3 text-slate-400" />
             <span>{row.original.totalStays}</span>
-          </div>
+          </span>
         ),
       },
       {
         accessorKey: 'lifetimeSpend',
         header: 'Lifetime Spend',
         cell: ({ row }) => (
-          <div className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
             ${Number(row.original.lifetimeSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
+          </span>
         ),
       },
       {

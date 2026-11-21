@@ -102,13 +102,13 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
         disabled={isExporting}
         onClick={handleToggle}
         className={cn(
-          'h-8 sm:h-9 px-2.5 text-xs text-brand-muted hover:text-brand-text flex items-center space-x-1.5 shadow-soft-xs',
+          'h-[34px] px-2.5 text-xs text-brand-muted hover:text-brand-text flex items-center space-x-1.5 shadow-soft-xs border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface rounded-lg',
           isOpen && 'border-brand-primary text-brand-primary dark:text-[#8495FF]'
         )}
         title="Export records in various formats"
       >
         <Download className="w-3.5 h-3.5 shrink-0" />
-        <span className="hidden sm:inline text-xs">{isExporting ? 'Exporting...' : title}</span>
+        <span className="hidden sm:inline text-xs font-medium">{isExporting ? 'Exporting...' : title}</span>
         <ChevronDown className={cn('w-3 h-3 transition-transform duration-150', isOpen && 'rotate-180')} />
       </Button>
 

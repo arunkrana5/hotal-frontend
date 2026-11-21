@@ -136,13 +136,13 @@ export const DeparturesScreen: React.FC = () => {
         accessorKey: 'guestName',
         header: 'Guest Details',
         cell: ({ row }) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate">
               {row.original.guestName}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              {row.original.roomTypeCode}
-            </div>
+            </span>
+            <span className="text-[11px] text-brand-muted shrink-0">
+              ({row.original.roomTypeCode})
+            </span>
           </div>
         ),
       },

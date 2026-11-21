@@ -136,15 +136,14 @@ export const VisitorLogScreen: React.FC = () => {
         accessorKey: 'visitorName',
         header: 'Visitor Identity',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
+            </span>
             {info.row.original.phone && (
-              <div className="text-[11px] font-mono text-brand-muted flex items-center space-x-1">
-                <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                <span>{info.row.original.phone}</span>
-              </div>
+              <span className="text-[11px] font-mono text-brand-muted shrink-0">
+                ({info.row.original.phone})
+              </span>
             )}
           </div>
         ),

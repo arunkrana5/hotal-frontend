@@ -85,7 +85,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
               transactions.map((tx) => (
                 <tr
                   key={tx.id}
-                  className="hover:bg-slate-50/70 dark:hover:bg-brand-darkCard/60 transition-colors group"
+                  className="h-10.5 max-h-10.5 hover:bg-slate-50/70 dark:hover:bg-brand-darkCard/60 transition-colors group whitespace-nowrap"
                 >
                   <td className="px-3.5 py-2.5 whitespace-nowrap font-mono text-[11px] text-brand-muted">
                     {tx.date}

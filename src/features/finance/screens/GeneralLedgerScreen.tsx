@@ -203,13 +203,15 @@ export const GeneralLedgerScreen: React.FC = () => {
         accessorKey: 'accountName',
         header: 'Account Name',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              {info.row.original.description || info.row.original.accountType}
-            </div>
+            </span>
+            {info.row.original.description && (
+              <span className="text-[11px] text-brand-muted truncate">
+                • {info.row.original.description}
+              </span>
+            )}
           </div>
         ),
       },

@@ -263,9 +263,9 @@ export function DataTable<TData>({
         </div>
       ) : effectiveShowHeader ? (
         /* 2. Unified One-Row Enterprise Toolbar */
-        <div className="px-3 py-2 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between gap-2.5 bg-brand-secondarySurface/30 dark:bg-brand-darkCard/50 min-h-[44px]">
+        <div className="px-3.5 py-2 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between gap-3 bg-brand-secondarySurface/40 dark:bg-brand-darkCard/50 min-h-[46px] select-none">
           {/* Left: Search + Filters + Title in One Row */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap overflow-x-auto">
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap overflow-x-auto py-0.5">
             {title && (
               <div className="flex items-center space-x-2 shrink-0 mr-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text">{title}</h3>
@@ -276,14 +276,14 @@ export function DataTable<TData>({
             )}
 
             {enableSearch && (
-              <form onSubmit={handleSearchSubmit} className="relative min-w-[200px] max-w-[280px] flex-1 shrink-0">
+              <form onSubmit={handleSearchSubmit} className="relative w-60 sm:w-72 shrink-0">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
                   value={localSearch}
                   onChange={(e) => handleSearchInputChange(e.target.value)}
-                  className="w-full h-8 sm:h-8.5 pl-8 pr-7 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-brand-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary shadow-soft-xs transition-all"
+                  className="w-full h-[34px] pl-8 pr-7 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-brand-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary shadow-soft-xs transition-all"
                 />
                 {localSearch && (
                   <button
@@ -322,17 +322,17 @@ export function DataTable<TData>({
                   handleClearSearch();
                   onResetFilters();
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-muted hover:text-rose-500 transition-colors px-1.5 py-1 shrink-0"
+                className="h-[34px] px-2.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-xs font-semibold text-brand-muted hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-all shadow-soft-xs inline-flex items-center gap-1.5 shrink-0"
                 title="Reset filters"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Reset</span>
               </button>
             )}
           </div>
 
           {/* Right: Columns Toggle (Customize) + Export Menu + Refresh + Actions */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          <div className="flex items-center gap-2 shrink-0 ml-auto py-0.5">
             {enableColumnVisibility && (
               <ColumnVisibilityPopover
                 moduleKey={effectiveModuleKey}
@@ -355,7 +355,7 @@ export function DataTable<TData>({
                 size="sm"
                 onClick={onRefresh}
                 disabled={isLoading}
-                className="text-brand-muted hover:text-brand-text h-8 sm:h-8.5 px-2.5"
+                className="h-[34px] px-2.5 text-xs text-brand-muted hover:text-brand-text border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface rounded-lg shadow-soft-xs"
                 title="Refresh Records"
               >
                 <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
@@ -378,12 +378,12 @@ export function DataTable<TData>({
           </div>
         )}
 
-        <table className="w-full text-left border-collapse text-xs">
+        <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr
                 key={headerGroup.id}
-                className="border-b border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard select-none"
+                className="border-b border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard select-none h-9"
               >
                 {headerGroup.headers.map((header) => {
                   const isSortable = header.column.getCanSort();
@@ -393,12 +393,12 @@ export function DataTable<TData>({
                     <th
                       key={header.id}
                       className={cn(
-                        'py-2.5 px-3 font-bold uppercase tracking-wider text-[10px] text-brand-muted whitespace-nowrap',
+                        'py-2 px-3 font-bold uppercase tracking-wider text-[10px] text-brand-muted whitespace-nowrap align-middle',
                         isSortable && 'cursor-pointer hover:bg-slate-100 dark:hover:bg-brand-darkSurface transition-colors'
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 whitespace-nowrap">
                         <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
                         {isSortable && (
                           <span className="text-brand-muted/70">
@@ -424,10 +424,13 @@ export function DataTable<TData>({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="hover:bg-slate-50/80 dark:hover:bg-brand-darkCard/50 transition-colors group"
+                  className="h-10.5 max-h-10.5 hover:bg-slate-50/80 dark:hover:bg-brand-darkCard/50 transition-colors group"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-2.5 px-3 text-brand-text font-normal align-middle">
+                    <td
+                      key={cell.id}
+                      className="py-2 px-3 text-brand-text font-normal align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[320px]"
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

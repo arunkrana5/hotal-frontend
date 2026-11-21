@@ -113,9 +113,13 @@ export const AttendanceScreen: React.FC = () => {
         accessorKey: 'employeeName',
         header: 'Staff Member',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{info.getValue() as string}</div>
-            <div className="text-[11px] text-slate-400 font-mono">{info.row.original.departmentCode}</div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+              {info.getValue() as string}
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono shrink-0">
+              ({info.row.original.departmentCode})
+            </span>
           </div>
         ),
       },

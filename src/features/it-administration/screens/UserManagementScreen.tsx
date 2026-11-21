@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { ColumnDef } from '@tanstack/react-table';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ListToolbar } from '@/components/enterprise/ListToolbar';
+import { DataTable } from '@/components/data-table/DataTable';
 import { UniversalSelect } from '@/components/common/UniversalSelect';
+import { StatusBadge } from '@/components/enterprise/StatusBadge';
 import { api } from '@/services/api';
 import {
   Users,
@@ -203,6 +205,119 @@ export const UserManagementScreen: React.FC = () => {
     }
   };
 
+  const userColumns = useMemo<ColumnDef<UserItem>[]>(
+    () => [
+      {
+        accessorKey: 'username',
+        header: 'User & Full Name',
+        cell: (info) => {
+          const u = info.row.original;
+          return (
+            <div className="flex items-center space-x-2 truncate">
+              <div className="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-brand-primary dark:text-[#8495FF] flex items-center justify-center font-bold text-[10px] shrink-0">
+                {u.firstName?.[0] || u.username[0].toUpperCase()}
+              </div>
+              <span className="font-semibold text-slate-900 dark:text-white truncate">
+                {u.fullName || u.username}
+              </span>
+              <span className="text-[11px] font-mono text-brand-muted shrink-0">
+                (@{u.username}{u.employeeId ? ` • ${u.employeeId}` : ''})
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'email',
+        header: 'Email Address',
+        cell: (info) => (
+          <span className="font-mono text-xs text-brand-text truncate block max-w-[200px]">
+            {info.getValue() as string}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'roles',
+        header: 'Assigned Roles',
+        cell: (info) => {
+          const userRoles = (info.getValue() as string[]) || [];
+          return (
+            <div className="flex items-center gap-1 overflow-hidden">
+              {userRoles.slice(0, 2).map((r) => (
+                <span
+                  key={r}
+                  className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-indigo-50 text-brand-primary dark:bg-indigo-950/60 dark:text-[#8495FF] border border-indigo-100 dark:border-indigo-900/40 shrink-0"
+                >
+                  {r}
+                </span>
+              ))}
+              {userRoles.length > 2 && (
+                <span className="text-[10px] px-1 py-0.5 text-brand-muted shrink-0">
+                  +{userRoles.length - 2}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: (info) => {
+          const status = info.getValue() as string;
+          return (
+            <StatusBadge
+              status={status === 'Active' ? 'ACTIVE' : status === 'Locked' ? 'MAINTENANCE' : 'INACTIVE'}
+              label={status}
+            />
+          );
+        },
+      },
+      {
+        accessorKey: 'lastLoginAt',
+        header: 'Last Sign-In',
+        cell: (info) => {
+          const val = info.getValue() as string;
+          return (
+            <span className="font-mono text-[11px] text-brand-muted">
+              {val ? new Date(val).toLocaleString() : 'Never'}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => {
+          const u = row.original;
+          return (
+            <div className="flex items-center justify-end space-x-1">
+              <button
+                onClick={() => setResetModalUser(u)}
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-brand-darkCard text-slate-500 hover:text-brand-primary transition-colors"
+                title="Reset Password"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => handleToggleStatus(u)}
+                className={`p-1 rounded transition-colors ${
+                  u.status === 'Active'
+                    ? 'hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-600'
+                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-400 hover:text-emerald-600'
+                }`}
+                title={u.status === 'Active' ? 'Lock Account' : 'Unlock Account'}
+              >
+                {u.status === 'Active' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
   return (
     <div className="space-y-4 pb-12 animate-in fade-in duration-200">
       {/* 1. Universal Page Header */}
@@ -282,160 +397,63 @@ export const UserManagementScreen: React.FC = () => {
 
       {/* 2. TAB: USERS DIRECTORY */}
       {activeTab === 'users' && (
-        <div className="space-y-3">
-          {/* Universal List Toolbar */}
-          <ListToolbar
-            searchQuery={searchQuery}
-            onSearchChange={(q) => {
-              setSearchQuery(q);
-              setPage(1);
-            }}
-            searchPlaceholder="Search by username, email or name..."
-            filters={[
-              {
-                id: 'status',
-                value: statusFilter,
-                onChange: (val) => {
-                  setStatusFilter(val || '');
-                  setPage(1);
-                },
-                placeholder: 'All Statuses',
-                options: [
-                  { value: '', label: 'All Statuses' },
-                  { value: 'Active', label: 'Active', badge: 'ACT' },
-                  { value: 'Locked', label: 'Locked', badge: 'LCK' },
-                  { value: 'Inactive', label: 'Inactive', badge: 'INA' },
-                ],
+        <DataTable
+          data={users}
+          columns={userColumns}
+          totalCount={totalUsers}
+          pageIndex={page - 1}
+          pageSize={10}
+          onPageChange={(p) => setPage(p + 1)}
+          onPageSizeChange={() => {}}
+          isLoading={isLoading}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => {
+            setSearchQuery(q);
+            setPage(1);
+          }}
+          searchPlaceholder="Search by username, email or name..."
+          filters={[
+            {
+              id: 'status',
+              value: statusFilter,
+              onChange: (val) => {
+                setStatusFilter(val || '');
+                setPage(1);
               },
-              {
-                id: 'role',
-                value: roleFilter,
-                onChange: (val) => {
-                  setRoleFilter(val || '');
-                  setPage(1);
-                },
-                placeholder: 'All Roles',
-                options: [
-                  { value: '', label: 'All Roles' },
-                  ...roles.map((r) => ({ value: r.name, label: r.name })),
-                ],
+              placeholder: 'All Statuses',
+              options: [
+                { value: '', label: 'All Statuses' },
+                { value: 'Active', label: 'Active', badge: 'ACT' },
+                { value: 'Locked', label: 'Locked', badge: 'LCK' },
+                { value: 'Inactive', label: 'Inactive', badge: 'INA' },
+              ],
+            },
+            {
+              id: 'role',
+              value: roleFilter,
+              onChange: (val) => {
+                setRoleFilter(val || '');
+                setPage(1);
               },
-            ]}
-            onResetFilters={() => {
-              setStatusFilter('');
-              setRoleFilter('');
-              setSearchQuery('');
-              setPage(1);
-            }}
-            isFiltered={!!statusFilter || !!roleFilter || !!searchQuery}
-          />
-
-          {/* Users DataTable */}
-          <div className="bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-xl overflow-hidden shadow-soft-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-navy-950/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">User &amp; Full Name</th>
-                    <th className="py-2.5 px-3">Email Address</th>
-                    <th className="py-2.5 px-3">Assigned Roles</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">Last Sign-In</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand-border dark:divide-brand-darkBorder">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-navy-950/20 transition-colors">
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center space-x-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-brand-primary dark:text-[#8495FF] flex items-center justify-center font-bold text-xs shrink-0">
-                            {u.firstName?.[0] || u.username[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900 dark:text-white flex items-center space-x-1.5">
-                              <span>{u.username}</span>
-                              {u.employeeId && (
-                                <span className="text-[10px] text-slate-400 font-normal">({u.employeeId})</span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">{u.fullName}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
-                        {u.email}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <div className="flex flex-wrap gap-1">
-                          {u.roles.map((r) => (
-                            <span
-                              key={r}
-                              className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-indigo-50 text-brand-primary dark:bg-indigo-950/60 dark:text-[#8495FF] border border-indigo-100 dark:border-indigo-900/40"
-                            >
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center space-x-1 ${
-                            u.status === 'Active'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                              : u.status === 'Locked'
-                              ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800'
-                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              u.status === 'Active' ? 'bg-emerald-500' : u.status === 'Locked' ? 'bg-red-500' : 'bg-slate-400'
-                            }`}
-                          />
-                          <span>{u.status}</span>
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px] text-slate-500">
-                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          <button
-                            onClick={() => setResetModalUser(u)}
-                            className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-navy-800 text-slate-500 hover:text-brand-primary transition-colors"
-                            title="Reset Password"
-                          >
-                            <KeyRound className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleStatus(u)}
-                            className={`p-1.5 rounded transition-colors ${
-                              u.status === 'Active'
-                                ? 'hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-600'
-                                : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-400 hover:text-emerald-600'
-                            }`}
-                            title={u.status === 'Active' ? 'Lock Account' : 'Unlock Account'}
-                          >
-                            {u.status === 'Active' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {users.length === 0 && !isLoading && (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400">
-                        No users found matching your filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+              placeholder: 'All Roles',
+              options: [
+                { value: '', label: 'All Roles' },
+                ...roles.map((r) => ({ value: r.name, label: r.name })),
+              ],
+            },
+          ]}
+          onResetFilters={() => {
+            setStatusFilter('');
+            setRoleFilter('');
+            setSearchQuery('');
+            setPage(1);
+          }}
+          isFiltered={!!statusFilter || !!roleFilter || !!searchQuery}
+          enableExport={true}
+          enableColumnVisibility={true}
+          exportFileName="users_directory.csv"
+          onRefresh={fetchUsers}
+        />
       )}
 
       {/* 3. TAB: ROLES & PERMISSIONS MATRIX */}

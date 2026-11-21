@@ -86,10 +86,9 @@ export const StoresLedgerScreen: React.FC = () => {
         cell: (info) => {
           const date = new Date(info.getValue() as string);
           return (
-            <div className="text-xs font-mono">
-              <div className="font-medium text-brand-text">{date.toLocaleDateString()}</div>
-              <div className="text-[11px] text-brand-muted">{date.toLocaleTimeString()}</div>
-            </div>
+            <span className="text-xs font-mono text-brand-text truncate">
+              {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
           );
         },
       },
@@ -97,13 +96,13 @@ export const StoresLedgerScreen: React.FC = () => {
         accessorKey: 'itemName',
         header: 'Inventory SKU',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] font-mono text-brand-muted">
-              Code: {info.row.original.itemCode}
-            </div>
+            </span>
+            <span className="text-[11px] font-mono text-brand-muted shrink-0">
+              ({info.row.original.itemCode})
+            </span>
           </div>
         ),
       },

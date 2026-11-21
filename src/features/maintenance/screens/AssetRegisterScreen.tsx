@@ -109,11 +109,13 @@ export const AssetRegisterScreen: React.FC = () => {
         accessorKey: 'assetName',
         header: 'Equipment Name',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">{info.getValue() as string}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              {info.row.original.manufacturer && `${info.row.original.manufacturer} • `}SN: {info.row.original.serialNumber || 'N/A'}
-            </div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+              {info.getValue() as string}
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+              ({info.row.original.manufacturer ? `${info.row.original.manufacturer} • ` : ''}SN: {info.row.original.serialNumber || 'N/A'})
+            </span>
           </div>
         ),
       },

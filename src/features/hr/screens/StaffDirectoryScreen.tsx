@@ -129,13 +129,13 @@ export const StaffDirectoryScreen: React.FC = () => {
         accessorKey: 'fullName',
         header: 'Employee Name',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              {info.row.original.designation || 'Staff Member'}
-            </div>
+            </span>
+            <span className="text-[11px] text-brand-muted shrink-0">
+              • {info.row.original.designation || 'Staff Member'}
+            </span>
           </div>
         ),
       },

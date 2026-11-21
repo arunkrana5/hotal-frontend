@@ -74,12 +74,12 @@ export const ReservationListScreen: React.FC = () => {
         accessorKey: 'confirmationNumber',
         header: 'Booking #',
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF] shrink-0">
               {row.original.confirmationNumber}
             </span>
-            <span className="text-[10px] text-brand-muted uppercase font-mono">
-              {row.original.bookingSource || 'DIRECT'}
+            <span className="text-[10px] text-brand-muted uppercase font-mono shrink-0">
+              • {row.original.bookingSource || 'DIRECT'}
             </span>
           </div>
         ),
@@ -88,19 +88,19 @@ export const ReservationListScreen: React.FC = () => {
         accessorKey: 'guestName',
         header: 'Guest Name',
         cell: ({ row }) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-xs">
-              <span>{row.original.guestName}</span>
-              {row.original.guestVip && row.original.guestVip !== 'Standard' && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
-                  <Crown className="w-2.5 h-2.5 text-amber-500" />
-                  <span>{row.original.guestVip}</span>
-                </span>
-              )}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              {row.original.adultsCount} Adults{row.original.childrenCount ? `, ${row.original.childrenCount} Kids` : ''}
-            </div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate">
+              {row.original.guestName}
+            </span>
+            {row.original.guestVip && row.original.guestVip !== 'Standard' && (
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5 shrink-0">
+                <Crown className="w-2.5 h-2.5 text-amber-500" />
+                <span>{row.original.guestVip}</span>
+              </span>
+            )}
+            <span className="text-[11px] text-brand-muted shrink-0">
+              ({row.original.adultsCount}A{row.original.childrenCount ? `, ${row.original.childrenCount}C` : ''})
+            </span>
           </div>
         ),
       },
@@ -108,13 +108,13 @@ export const ReservationListScreen: React.FC = () => {
         accessorKey: 'roomTypeCode',
         header: 'Room Allocation',
         cell: ({ row }) => (
-          <div className="text-xs">
-            <div className="font-semibold text-slate-800 dark:text-slate-200">
-              {row.original.roomTypeCode}
-            </div>
-            <div className="text-[11px] font-mono text-brand-muted">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate">
               {row.original.assignedRoomNumber ? `Room #${row.original.assignedRoomNumber}` : 'Unallocated'}
-            </div>
+            </span>
+            <span className="text-[11px] font-mono text-brand-muted shrink-0">
+              ({row.original.roomTypeCode})
+            </span>
           </div>
         ),
       },
@@ -122,14 +122,9 @@ export const ReservationListScreen: React.FC = () => {
         accessorKey: 'checkInDate',
         header: 'Stay Schedule',
         cell: ({ row }) => (
-          <div className="text-xs space-y-0.5 font-mono">
-            <div className="text-brand-text">
-              In: {new Date(row.original.checkInDate).toLocaleDateString()}
-            </div>
-            <div className="text-brand-muted text-[11px]">
-              Out: {new Date(row.original.checkOutDate).toLocaleDateString()}
-            </div>
-          </div>
+          <span className="font-mono text-xs text-brand-text truncate">
+            {new Date(row.original.checkInDate).toLocaleDateString()} → {new Date(row.original.checkOutDate).toLocaleDateString()}
+          </span>
         ),
       },
       {

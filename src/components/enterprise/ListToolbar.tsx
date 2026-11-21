@@ -103,12 +103,12 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
         )}
       >
         {/* Left: Search + Universal Select Filters in a Single Horizontal Row */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap">
+        <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap py-0.5">
           {/* Universal Search Input */}
           {onSearchChange && (
             <form
               onSubmit={handleSearchSubmit}
-              className="relative min-w-[180px] max-w-[280px] flex-1 shrink-0"
+              className="relative w-60 sm:w-72 shrink-0"
             >
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
@@ -119,7 +119,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
                   onSearchChange(e.target.value);
                 }}
                 placeholder={searchPlaceholder}
-                className="w-full h-8 sm:h-9 pl-8 pr-7 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-brand-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary shadow-soft-xs transition-all"
+                className="w-full h-[34px] pl-8 pr-7 text-xs rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-brand-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-primary shadow-soft-xs transition-all"
               />
               {localSearch && (
                 <button
@@ -182,11 +182,11 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
               variant="outline"
               size="sm"
               onClick={() => setIsAdvancedOpen(true)}
-              className="h-8 sm:h-9 px-2.5 text-xs text-brand-muted hover:text-brand-text shrink-0 shadow-soft-xs flex items-center space-x-1"
+              className="h-[34px] px-2.5 text-xs text-brand-muted hover:text-brand-text shrink-0 shadow-soft-xs flex items-center space-x-1 border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface rounded-lg"
               title="More Filters"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline text-xs">More Filters</span>
+              <span className="hidden lg:inline text-xs font-medium">More Filters</span>
             </Button>
           )}
 
@@ -198,17 +198,17 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
                 handleClearSearch();
                 onResetFilters();
               }}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-muted hover:text-rose-500 transition-colors px-1.5 py-1 shrink-0"
+              className="h-[34px] px-2.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface text-xs font-semibold text-brand-muted hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-all shadow-soft-xs inline-flex items-center gap-1.5 shrink-0"
               title="Reset all filters to defaults"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Reset</span>
             </button>
           )}
         </div>
 
         {/* Right: Custom Columns, Export Menu, Custom Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 py-0.5">
           {/* Column Visibility Popover */}
           {moduleKey && columns && onColumnsChange && (
             <ColumnVisibilityPopover

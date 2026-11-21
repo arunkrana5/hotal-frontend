@@ -159,14 +159,14 @@ export const WorkOrdersScreen: React.FC = () => {
         accessorKey: 'assetName',
         header: 'Asset / Equipment',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
-              {info.getValue() as string || 'General Facility'}
-            </div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+              {(info.getValue() as string) || 'General Facility'}
+            </span>
             {info.row.original.roomNumber && (
-              <div className="text-[11px] font-mono text-brand-muted">
-                Room #{info.row.original.roomNumber}
-              </div>
+              <span className="text-[11px] font-mono text-brand-muted shrink-0">
+                (Room #{info.row.original.roomNumber})
+              </span>
             )}
           </div>
         ),

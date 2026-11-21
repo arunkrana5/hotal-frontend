@@ -165,13 +165,13 @@ export const InvoicesScreen: React.FC = () => {
         accessorKey: 'clientOrVendorName',
         header: 'Billed To (Party)',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted uppercase font-mono">
-              Type: {info.row.original.invoiceType}
-            </div>
+            </span>
+            <span className="text-[10px] text-brand-muted uppercase font-mono shrink-0">
+              ({info.row.original.invoiceType})
+            </span>
           </div>
         ),
       },
@@ -179,14 +179,9 @@ export const InvoicesScreen: React.FC = () => {
         accessorKey: 'issueDate',
         header: 'Dates',
         cell: (info) => (
-          <div className="text-xs space-y-0.5">
-            <div className="text-brand-muted text-[11px]">
-              Issued: <span className="font-mono text-brand-text">{new Date(info.getValue() as string).toLocaleDateString()}</span>
-            </div>
-            <div className="text-brand-muted text-[11px]">
-              Due: <span className="font-mono text-brand-text">{new Date(info.row.original.dueDate).toLocaleDateString()}</span>
-            </div>
-          </div>
+          <span className="font-mono text-xs text-brand-text truncate">
+            {new Date(info.getValue() as string).toLocaleDateString()} (Due: {new Date(info.row.original.dueDate).toLocaleDateString()})
+          </span>
         ),
       },
       {

@@ -174,13 +174,13 @@ export const InventoryItemsScreen: React.FC = () => {
         accessorKey: 'itemName',
         header: 'Item Specification',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              Category: {info.row.original.category} &bull; Unit: {info.row.original.unitOfMeasure}
-            </div>
+            </span>
+            <span className="text-[11px] text-brand-muted shrink-0">
+              ({info.row.original.category} • {info.row.original.unitOfMeasure})
+            </span>
           </div>
         ),
       },

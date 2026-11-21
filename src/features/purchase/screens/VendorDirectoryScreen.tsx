@@ -119,28 +119,22 @@ export const VendorDirectoryScreen: React.FC = () => {
         accessorKey: 'vendorName',
         header: 'Supplier / Company Name',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
-              {info.getValue() as string}
-            </div>
-            <div className="text-[11px] font-mono text-brand-muted">
-              {info.row.original.vendorCode}
-            </div>
-          </div>
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+            {info.getValue() as string}
+          </span>
         ),
       },
       {
         accessorKey: 'contactPerson',
         header: 'Point of Contact',
         cell: (info) => (
-          <div className="text-xs space-y-0.5">
-            <div className="font-medium text-slate-800 dark:text-slate-200">
-              {info.getValue() as string || 'General Desk'}
-            </div>
-            <div className="text-[11px] text-brand-muted flex items-center space-x-1.5">
-              {info.row.original.email && <span>{info.row.original.email}</span>}
-              {info.row.original.phone && <span className="font-mono">({info.row.original.phone})</span>}
-            </div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-medium text-slate-800 dark:text-slate-200 text-xs truncate">
+              {(info.getValue() as string) || 'General Desk'}
+            </span>
+            <span className="text-[11px] text-brand-muted shrink-0">
+              {info.row.original.phone ? `(${info.row.original.phone})` : info.row.original.email ? `(${info.row.original.email})` : ''}
+            </span>
           </div>
         ),
       },

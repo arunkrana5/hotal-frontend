@@ -160,13 +160,13 @@ export const PurchaseOrdersScreen: React.FC = () => {
         accessorKey: 'vendorName',
         header: 'Supplier / Vendor',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted font-mono">
-              Terms: {info.row.original.paymentTerms || 'Net 30'}
-            </div>
+            </span>
+            <span className="text-[11px] text-brand-muted font-mono shrink-0">
+              ({info.row.original.paymentTerms || 'Net 30'})
+            </span>
           </div>
         ),
       },
@@ -174,16 +174,10 @@ export const PurchaseOrdersScreen: React.FC = () => {
         accessorKey: 'orderDate',
         header: 'Order Schedule',
         cell: (info) => (
-          <div className="text-xs space-y-0.5 font-mono">
-            <div className="text-brand-text">
-              Date: {new Date(info.getValue() as string).toLocaleDateString()}
-            </div>
-            {info.row.original.expectedDeliveryDate && (
-              <div className="text-brand-muted text-[11px]">
-                Exp: {new Date(info.row.original.expectedDeliveryDate).toLocaleDateString()}
-              </div>
-            )}
-          </div>
+          <span className="font-mono text-xs text-brand-text truncate">
+            {new Date(info.getValue() as string).toLocaleDateString()}
+            {info.row.original.expectedDeliveryDate ? ` → Exp: ${new Date(info.row.original.expectedDeliveryDate).toLocaleDateString()}` : ''}
+          </span>
         ),
       },
       {

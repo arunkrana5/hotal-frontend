@@ -129,13 +129,15 @@ export const MenuItemsScreen: React.FC = () => {
         accessorKey: 'itemName',
         header: 'Dish / Item Name',
         cell: (info) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
               {info.getValue() as string}
-            </div>
-            <div className="text-[11px] text-brand-muted truncate max-w-xs">
-              {info.row.original.description || info.row.original.category}
-            </div>
+            </span>
+            {info.row.original.description && (
+              <span className="text-[11px] text-brand-muted truncate">
+                • {info.row.original.description}
+              </span>
+            )}
           </div>
         ),
       },

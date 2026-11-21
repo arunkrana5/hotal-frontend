@@ -153,19 +153,19 @@ export const ArrivalsScreen: React.FC = () => {
         accessorKey: 'guestName',
         header: 'Guest Name',
         cell: ({ row }) => (
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-xs">
-              <span>{row.original.guestName}</span>
-              {row.original.guestVip && row.original.guestVip !== 'Standard' && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
-                  <Crown className="w-2.5 h-2.5 text-amber-500" />
-                  <span>{row.original.guestVip}</span>
-                </span>
-              )}
-            </div>
-            <div className="text-[11px] text-brand-muted">
-              {row.original.adultsCount} Adults &bull; {row.original.roomTypeCode}
-            </div>
+          <div className="flex items-center space-x-1.5 truncate">
+            <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate">
+              {row.original.guestName}
+            </span>
+            {row.original.guestVip && row.original.guestVip !== 'Standard' && (
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5 shrink-0">
+                <Crown className="w-2.5 h-2.5 text-amber-500" />
+                <span>{row.original.guestVip}</span>
+              </span>
+            )}
+            <span className="text-[11px] text-brand-muted shrink-0">
+              ({row.original.adultsCount}A • {row.original.roomTypeCode})
+            </span>
           </div>
         ),
       },
