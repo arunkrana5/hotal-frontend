@@ -263,7 +263,7 @@ export function DataTable<TData>({
         </div>
       ) : effectiveShowHeader ? (
         /* 2. Unified One-Row Enterprise Toolbar */
-        <div className="px-3 py-2 border-b border-brand-border dark:border-brand-darkBorder flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-brand-secondarySurface/30 dark:bg-brand-darkCard/50">
+        <div className="px-3 py-2 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between gap-2.5 bg-brand-secondarySurface/30 dark:bg-brand-darkCard/50 min-h-[44px]">
           {/* Left: Search + Filters + Title in One Row */}
           <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap overflow-x-auto">
             {title && (
@@ -332,7 +332,7 @@ export function DataTable<TData>({
           </div>
 
           {/* Right: Columns Toggle (Customize) + Export Menu + Refresh + Actions */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
             {enableColumnVisibility && (
               <ColumnVisibilityPopover
                 moduleKey={effectiveModuleKey}
