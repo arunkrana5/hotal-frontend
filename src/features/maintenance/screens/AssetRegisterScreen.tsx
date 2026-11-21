@@ -5,10 +5,16 @@ import { api } from '@/services/api';
 import { PagedResult } from '@/types/common';
 import { AssetDto, CreateAssetRequest } from '@/types/erp';
 import { Button } from '@/components/common/Button';
-import { Card, Badge } from '@/components/common/Card';
-import { Input, Select, FormGrid } from '@/components/common/Input';
-import { Modal } from '@/components/common/Modal';
+import { Card } from '@/components/common/Card';
 import { PageContainer, PageHeader, PageActions } from '@/components/layout';
+import {
+  RowActions,
+  DetailDrawer,
+  FormDrawer,
+  FormSection,
+  StatusBadge,
+} from '@/components/enterprise';
+import { UniversalSelect } from '@/components/common/UniversalSelect';
 import {
   Wrench,
   Plus,
@@ -20,6 +26,8 @@ import {
   DollarSign,
   ShieldCheck,
   Building,
+  AlertCircle,
+  Download,
 } from 'lucide-react';
 
 export const AssetRegisterScreen: React.FC = () => {
@@ -32,10 +40,14 @@ export const AssetRegisterScreen: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  // Modal
-  const [showModal, setShowModal] = useState<boolean>(false);
+  // Drawers state
+  const [showFormDrawer, setShowFormDrawer] = useState<boolean>(false);
+  const [editingAsset, setEditingAsset] = useState<AssetDto | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<AssetDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [newAsset, setNewAsset] = useState<CreateAssetRequest>({
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState<CreateAssetRequest>({
     assetCode: '',
     assetName: '',
     category: 'HVAC',
@@ -69,30 +81,84 @@ export const AssetRegisterScreen: React.FC = () => {
     fetchAssets();
   }, [pageIndex, pageSize, search, categoryFilter, statusFilter]);
 
-  const handleCreateAsset = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingAsset(null);
+    setFormData({
+      assetCode: '',
+      assetName: '',
+      category: 'HVAC',
+      location: '',
+      purchaseDate: new Date().toISOString().split('T')[0],
+      purchaseCost: 5000,
+      warrantyExpiryDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+      serialNumber: '',
+      manufacturer: '',
+    });
+    setErrorMsg(null);
+    setShowFormDrawer(true);
+  };
+
+  const handleOpenEdit = (asset: AssetDto) => {
+    setEditingAsset(asset);
+    setFormData({
+      assetCode: asset.assetCode,
+      assetName: asset.assetName,
+      category: asset.category,
+      location: asset.location,
+      purchaseDate: asset.purchaseDate,
+      purchaseCost: asset.purchaseCost,
+      warrantyExpiryDate: asset.warrantyExpiryDate || '',
+      serialNumber: asset.serialNumber || '',
+      manufacturer: asset.manufacturer || '',
+    });
+    setErrorMsg(null);
+    setShowFormDrawer(true);
+  };
+
+  const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.assetCode.trim() || !formData.assetName.trim()) {
+      setErrorMsg('Asset code and name are required.');
+      return;
+    }
+
     setSubmitting(true);
-    const res = await api.post<AssetDto>('/maintenance/assets', newAsset);
-    if (res.success) {
-      setShowModal(false);
-      setNewAsset({
-        assetCode: '',
-        assetName: '',
-        category: 'HVAC',
-        location: '',
-        purchaseDate: new Date().toISOString().split('T')[0],
-        purchaseCost: 5000,
-        warrantyExpiryDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
-        serialNumber: '',
-        manufacturer: '',
+    setErrorMsg(null);
+
+    if (editingAsset) {
+      const res = await api.put<AssetDto>(`/maintenance/assets/${editingAsset.id}`, {
+        assetName: formData.assetName.trim(),
+        category: formData.category.trim().toUpperCase(),
+        location: formData.location.trim(),
+        purchaseDate: formData.purchaseDate,
+        purchaseCost: Number(formData.purchaseCost),
+        warrantyExpiryDate: formData.warrantyExpiryDate?.trim() || null,
+        serialNumber: formData.serialNumber?.trim() || null,
+        manufacturer: formData.manufacturer?.trim() || null,
       });
-      fetchAssets();
+
+      if (res.success) {
+        setShowFormDrawer(false);
+        setEditingAsset(null);
+        fetchAssets();
+      } else {
+        setErrorMsg(res.message || 'Failed to update asset.');
+      }
+    } else {
+      const res = await api.post<AssetDto>('/maintenance/assets', formData);
+      if (res.success) {
+        setShowFormDrawer(false);
+        fetchAssets();
+      } else {
+        setErrorMsg(res.message || 'Failed to register asset.');
+      }
     }
     setSubmitting(false);
   };
 
-  const totalAssetValue = assets.reduce((sum, a) => sum + (a.purchaseCost || 0), 0);
-  const operationalCount = assets.filter(a => a.status === 'OPERATIONAL' || !a.status).length;
+  const totalAssetValue = useMemo(() => {
+    return assets.reduce((sum, a) => sum + (a.purchaseCost || 0), 0);
+  }, [assets]);
 
   const columns = useMemo<ColumnDef<AssetDto>[]>(
     () => [
@@ -100,7 +166,7 @@ export const AssetRegisterScreen: React.FC = () => {
         accessorKey: 'assetCode',
         header: 'Asset Tag',
         cell: (info) => (
-          <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+          <span className="font-mono font-bold text-xs text-brand-primary dark:text-[#8495FF]">
             {info.getValue() as string}
           </span>
         ),
@@ -109,32 +175,27 @@ export const AssetRegisterScreen: React.FC = () => {
         accessorKey: 'assetName',
         header: 'Equipment Name',
         cell: (info) => (
-          <div className="flex items-center space-x-1.5 truncate">
-            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
-              {info.getValue() as string}
-            </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
-              ({info.row.original.manufacturer ? `${info.row.original.manufacturer} • ` : ''}SN: {info.row.original.serialNumber || 'N/A'})
-            </span>
-          </div>
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+            {info.getValue() as string}
+          </span>
         ),
       },
       {
         accessorKey: 'category',
         header: 'Category',
         cell: (info) => (
-          <Badge variant="neutral" size="sm" className="font-mono">
+          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
             {info.getValue() as string}
-          </Badge>
+          </span>
         ),
       },
       {
         accessorKey: 'location',
         header: 'Plant Location',
         cell: (info) => (
-          <div className="text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            <span>{(info.getValue() as string) || 'Central Plant'}</span>
+          <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="truncate">{info.getValue() as string}</span>
           </div>
         ),
       },
@@ -166,11 +227,25 @@ export const AssetRegisterScreen: React.FC = () => {
         header: 'Health Status',
         cell: (info) => {
           const s = (info.getValue() as string) || 'OPERATIONAL';
-          if (s === 'OPERATIONAL') return <Badge variant="success" dot>Operational</Badge>;
-          if (s === 'UNDER_MAINTENANCE') return <Badge variant="warning" dot>In Maintenance</Badge>;
-          if (s === 'DECOMMISSIONED') return <Badge variant="danger">Decommissioned</Badge>;
-          return <Badge variant="neutral">{s}</Badge>;
+          return (
+            <StatusBadge
+              status={s === 'OPERATIONAL' ? 'ACTIVE' : s === 'UNDER_MAINTENANCE' ? 'WARNING' : 'INACTIVE'}
+              label={s.replace(/_/g, ' ')}
+            />
+          );
         },
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <RowActions
+            onView={() => setSelectedAsset(row.original)}
+            onEdit={() => handleOpenEdit(row.original)}
+            isActive={row.original.status === 'OPERATIONAL'}
+            onToggleStatus={() => {}}
+          />
+        ),
       },
     ],
     []
@@ -178,20 +253,27 @@ export const AssetRegisterScreen: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* Universal Compact Page Header */}
+      {/* 1. Header */}
       <PageHeader
-        breadcrumb={[
-          { label: 'Maintenance', href: '/maintenance/work-orders' },
-          { label: 'Fixed Assets' },
-        ]}
         title="Fixed Asset Register & Plant Registry"
-        subtitle="Chillers, elevators, generators, commercial kitchen ranges, warranty tracking & depreciation"
+        badge={<StatusBadge status="ACTIVE" label="Capital Assets" />}
         actions={
           <PageActions>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => setShowModal(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => {}}
+              className="text-xs"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+            >
+              Export Register
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenCreate}
+              className="text-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
               Register Capital Asset
             </Button>
@@ -199,7 +281,7 @@ export const AssetRegisterScreen: React.FC = () => {
         }
       />
 
-      {/* KPI Cards */}
+      {/* 2. KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="p-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shrink-0">
@@ -238,7 +320,7 @@ export const AssetRegisterScreen: React.FC = () => {
               Operational Health
             </div>
             <div className="text-lg font-bold text-purple-600 dark:text-purple-400 tracking-tight">
-              {operationalCount} Active
+              {assets.filter((a) => a.status === 'OPERATIONAL').length} / {assets.length} Online
             </div>
           </div>
         </Card>
@@ -249,173 +331,276 @@ export const AssetRegisterScreen: React.FC = () => {
           </div>
           <div>
             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Warranty Coverage
+              Warranty Protected
             </div>
-            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-              Active OEM Contracts
+            <div className="text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tight">
+              {assets.filter((a) => a.warrantyExpiryDate && new Date(a.warrantyExpiryDate) > new Date()).length} Assets
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      {/* Assets DataTable with Integrated Filter & Toolbar */}
-      <DataTable<AssetDto>
-        title="Physical Asset Register"
+      {/* 3. Data Table with Integrated Toolbar */}
+      <DataTable
         data={assets}
         columns={columns}
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        isLoading={loading}
         onPageChange={setPageIndex}
         onPageSizeChange={setPageSize}
-        onRefresh={fetchAssets}
-        exportFileName="asset_register.csv"
+        isLoading={loading}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search asset tag, equipment name, location..."
         filters={[
           {
             id: 'category',
-            label: 'Asset Category',
             value: categoryFilter,
+            onChange: setCategoryFilter,
+            placeholder: 'All Categories',
             options: [
-              { label: 'All Asset Categories', value: '' },
-              { label: 'HVAC & Chillers', value: 'HVAC' },
-              { label: 'Generators & Transformers', value: 'ELECTRICAL' },
-              { label: 'Boilers & Water Plants', value: 'PLUMBING' },
-              { label: 'Commercial Kitchen Ranges', value: 'KITCHEN' },
-              { label: 'Elevators & Escalators', value: 'ELEVATOR' },
+              { value: '', label: 'All Categories' },
+              { value: 'HVAC', label: 'HVAC & Ventilation' },
+              { value: 'ELECTRICAL', label: 'Electrical & Backup' },
+              { value: 'PLUMBING', label: 'Plumbing & Water Heating' },
+              { value: 'KITCHEN', label: 'Commercial Kitchen' },
+              { value: 'ELEVATOR', label: 'Elevators & Escalators' },
             ],
-            onChange: (val) => {
-              setCategoryFilter(val);
-              setPageIndex(0);
-            },
-            width: 'w-48',
+          },
+          {
+            id: 'status',
+            value: statusFilter,
+            onChange: setStatusFilter,
+            placeholder: 'All Health Statuses',
+            options: [
+              { value: '', label: 'All Health Statuses' },
+              { value: 'OPERATIONAL', label: 'Operational', badge: 'ACT' },
+              { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance', badge: 'WRN' },
+              { value: 'DECOMMISSIONED', label: 'Decommissioned', badge: 'DEC' },
+            ],
           },
         ]}
-        onSearchChange={(s) => {
-          setSearch(s);
-          setPageIndex(0);
+        onResetFilters={() => {
+          setSearch('');
+          setCategoryFilter('');
+          setStatusFilter('');
         }}
-        searchPlaceholder="Filter assets by tag, name, or serial..."
+        isFiltered={search !== '' || categoryFilter !== '' || statusFilter !== ''}
+        enableExport={true}
+        enableColumnVisibility={true}
+        exportFileName="asset_register.csv"
+        onRefresh={fetchAssets}
       />
 
-      {/* Add Asset Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Register Capital Hotel Asset"
-        subtitle="Add plant machinery, serial numbers, warranty terms, and location"
-        icon={<Building className="w-4 h-4" />}
-        size="lg"
-        onSubmit={handleCreateAsset}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowModal(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !newAsset.assetCode || !newAsset.assetName}
-              isLoading={submitting}
-              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            >
-              Save Asset Record
-            </Button>
-          </>
-        }
+      {/* 4. Create / Edit Asset Drawer */}
+      <FormDrawer
+        isOpen={showFormDrawer}
+        onClose={() => {
+          setShowFormDrawer(false);
+          setEditingAsset(null);
+        }}
+        onSubmit={handleSaveAsset}
+        title={editingAsset ? `Edit Asset #${editingAsset.assetCode}` : 'Register Capital Asset'}
+        submitText={submitting ? 'Saving...' : editingAsset ? 'Update Asset' : 'Save Asset Record'}
+        isLoading={submitting}
+        width="lg"
       >
-        <FormGrid cols={2}>
-          <Input
-            label="Asset Code / Tag *"
-            required
-            value={newAsset.assetCode}
-            onChange={(e) => setNewAsset({ ...newAsset, assetCode: e.target.value })}
-            placeholder="e.g. AST-CHLR-01"
-            className="font-mono uppercase"
-          />
-          <Input
-            label="Asset Name *"
-            required
-            value={newAsset.assetName}
-            onChange={(e) => setNewAsset({ ...newAsset, assetName: e.target.value })}
-            placeholder="e.g. Trane Centrifugal Chiller 500T"
-          />
-        </FormGrid>
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-[#D44848]/10 text-[#D44848] text-xs font-medium border border-[#D44848]/25 flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        <FormGrid cols={2}>
+        <FormSection title="Equipment Identification" columns={2}>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Asset Category
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Asset Tag / Code *
             </label>
-            <Select
-              value={newAsset.category}
-              onChange={(e) => setNewAsset({ ...newAsset, category: e.target.value })}
-            >
-              <option value="HVAC">HVAC &amp; Ventilation</option>
-              <option value="ELECTRICAL">Electrical &amp; Backup</option>
-              <option value="PLUMBING">Plumbing &amp; Water Heating</option>
-              <option value="KITCHEN">Kitchen Commercial Range</option>
-              <option value="ELEVATOR">Elevators &amp; Vertical Transport</option>
-            </Select>
+            <input
+              type="text"
+              required
+              disabled={!!editingAsset}
+              placeholder="e.g. AST-CHLR-01"
+              value={formData.assetCode}
+              onChange={(e) => setFormData({ ...formData, assetCode: e.target.value.toUpperCase() })}
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold uppercase rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            />
           </div>
 
-          <Input
-            label="Plant Location *"
-            required
-            value={newAsset.location}
-            onChange={(e) => setNewAsset({ ...newAsset, location: e.target.value })}
-            placeholder="e.g. Rooftop Mechanical Plant 4"
-          />
-        </FormGrid>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Asset Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Trane Centrifugal Chiller 500T"
+              value={formData.assetName}
+              onChange={(e) => setFormData({ ...formData, assetName: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
 
-        <FormGrid cols={3}>
-          <Input
-            label="Purchase Cost ($) *"
-            type="number"
-            step="0.01"
-            required
-            value={newAsset.purchaseCost}
-            onChange={(e) => setNewAsset({ ...newAsset, purchaseCost: Number(e.target.value) })}
-            className="font-mono"
-          />
-          <Input
-            label="Commissioning Date *"
-            type="date"
-            required
-            value={newAsset.purchaseDate}
-            onChange={(e) => setNewAsset({ ...newAsset, purchaseDate: e.target.value })}
-          />
-          <Input
-            label="Warranty Expiry"
-            type="date"
-            value={newAsset.warrantyExpiryDate}
-            onChange={(e) => setNewAsset({ ...newAsset, warrantyExpiryDate: e.target.value })}
-          />
-        </FormGrid>
+          <div>
+            <UniversalSelect
+              label="Asset Category"
+              required
+              size="sm"
+              value={formData.category}
+              onChange={(val) => setFormData({ ...formData, category: val || 'HVAC' })}
+              options={[
+                { value: 'HVAC', label: 'HVAC & Ventilation', badge: 'HVAC' },
+                { value: 'ELECTRICAL', label: 'Electrical & Backup', badge: 'ELEC' },
+                { value: 'PLUMBING', label: 'Plumbing & Water Heating', badge: 'PLMB' },
+                { value: 'KITCHEN', label: 'Kitchen Commercial Range', badge: 'KIT' },
+                { value: 'ELEVATOR', label: 'Elevators & Vertical Transport', badge: 'ELEV' },
+              ]}
+              clearable={false}
+            />
+          </div>
 
-        <FormGrid cols={2}>
-          <Input
-            label="Manufacturer / Brand"
-            value={newAsset.manufacturer}
-            onChange={(e) => setNewAsset({ ...newAsset, manufacturer: e.target.value })}
-            placeholder="e.g. Trane Technologies"
-          />
-          <Input
-            label="OEM Serial Number"
-            value={newAsset.serialNumber}
-            onChange={(e) => setNewAsset({ ...newAsset, serialNumber: e.target.value })}
-            placeholder="e.g. SN-TRN-92841"
-            className="font-mono"
-          />
-        </FormGrid>
-      </Modal>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Plant Location *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Rooftop Mechanical Plant 4"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Financial & Warranty Terms" columns={2}>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Purchase Cost ($) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              value={formData.purchaseCost}
+              onChange={(e) => setFormData({ ...formData, purchaseCost: parseFloat(e.target.value) || 0 })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Commissioning Date *
+            </label>
+            <input
+              type="date"
+              required
+              value={formData.purchaseDate}
+              onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Warranty Expiry Date
+            </label>
+            <input
+              type="date"
+              value={formData.warrantyExpiryDate || ''}
+              onChange={(e) => setFormData({ ...formData, warrantyExpiryDate: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              OEM Serial Number
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. SN-TRN-92841"
+              value={formData.serialNumber || ''}
+              onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Manufacturer / Brand
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Trane Technologies"
+              value={formData.manufacturer || ''}
+              onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+      </FormDrawer>
+
+      {/* 5. Detail Drawer */}
+      {selectedAsset && (
+        <DetailDrawer
+          isOpen={!!selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          title={selectedAsset.assetName}
+          subtitle={`Tag #${selectedAsset.assetCode} | Location: ${selectedAsset.location}`}
+          status={selectedAsset.status}
+          width="md"
+          onEdit={() => {
+            const asset = selectedAsset;
+            setSelectedAsset(null);
+            handleOpenEdit(asset);
+          }}
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Capital Value</span>
+                <span className="font-mono font-bold text-base text-brand-text">
+                  ${selectedAsset.purchaseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Commissioned</span>
+                <span className="font-mono text-brand-text">{selectedAsset.purchaseDate}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Category</span>
+                <span className="font-semibold text-brand-text">{selectedAsset.category}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Status</span>
+                <StatusBadge status={selectedAsset.status === 'OPERATIONAL' ? 'ACTIVE' : 'WARNING'} label={selectedAsset.status} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Serial Number</span>
+                <span className="font-mono text-brand-text">{selectedAsset.serialNumber || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Manufacturer</span>
+                <span className="text-brand-text">{selectedAsset.manufacturer || 'N/A'}</span>
+              </div>
+            </div>
+
+            {selectedAsset.location && (
+              <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+                <span className="text-[10px] font-bold uppercase text-brand-muted block mb-0.5">Physical Plant Location</span>
+                <p className="text-brand-text">{selectedAsset.location}</p>
+              </div>
+            )}
+          </div>
+        </DetailDrawer>
+      )}
     </PageContainer>
   );
 };
+
+export default AssetRegisterScreen;

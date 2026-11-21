@@ -42,6 +42,7 @@ export const InventoryItemsScreen: React.FC = () => {
 
   // Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<InventoryItemDto | null>(null);
   const [showAdjustDrawer, setShowAdjustDrawer] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItemDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -95,7 +96,43 @@ export const InventoryItemsScreen: React.FC = () => {
     fetchItems();
   }, [fetchItems]);
 
-  const handleCreateItem = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingItem(null);
+    setNewItem({
+      itemCode: '',
+      itemName: '',
+      category: 'LINEN',
+      unitOfMeasure: 'PCS',
+      unitCost: 10,
+      currentStock: 50,
+      reorderLevel: 20,
+      minimumStock: 10,
+      maximumStock: 200,
+      locationBin: 'BIN-01',
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleOpenEdit = (item: InventoryItemDto) => {
+    setEditingItem(item);
+    setNewItem({
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      category: item.category,
+      unitOfMeasure: item.unitOfMeasure,
+      unitCost: item.unitCost,
+      currentStock: item.currentStock,
+      reorderLevel: item.reorderLevel,
+      minimumStock: item.minimumStock,
+      maximumStock: item.maximumStock,
+      locationBin: item.locationBin || '',
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItem.itemCode.trim() || !newItem.itemName.trim()) {
       setErrorMsg('Item code and item name are required.');
@@ -104,24 +141,34 @@ export const InventoryItemsScreen: React.FC = () => {
 
     setSubmitting(true);
     setErrorMsg(null);
-    const res = await api.post<InventoryItemDto>('/inventory/items', newItem);
-    if (res.success) {
-      setShowCreateDrawer(false);
-      setNewItem({
-        itemCode: '',
-        itemName: '',
-        category: 'LINEN',
-        unitOfMeasure: 'PCS',
-        unitCost: 10,
-        currentStock: 50,
-        reorderLevel: 20,
-        minimumStock: 10,
-        maximumStock: 200,
-        locationBin: 'BIN-01',
+
+    if (editingItem) {
+      const res = await api.put<InventoryItemDto>(`/inventory/items/${editingItem.id}`, {
+        itemName: newItem.itemName.trim(),
+        category: newItem.category.trim().toUpperCase(),
+        unitOfMeasure: newItem.unitOfMeasure.trim().toUpperCase(),
+        unitCost: Number(newItem.unitCost),
+        reorderLevel: Number(newItem.reorderLevel),
+        minimumStock: Number(newItem.minimumStock),
+        maximumStock: Number(newItem.maximumStock),
+        locationBin: newItem.locationBin?.trim() || null,
       });
-      fetchItems();
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setEditingItem(null);
+        fetchItems();
+      } else {
+        setErrorMsg(res.message || 'Failed to update inventory item.');
+      }
     } else {
-      setErrorMsg(res.message || 'Failed to create item.');
+      const res = await api.post<InventoryItemDto>('/inventory/items', newItem);
+      if (res.success) {
+        setShowCreateDrawer(false);
+        fetchItems();
+      } else {
+        setErrorMsg(res.message || 'Failed to create item.');
+      }
     }
     setSubmitting(false);
   };
@@ -248,6 +295,7 @@ export const InventoryItemsScreen: React.FC = () => {
         cell: ({ row }) => (
           <RowActions
             onView={() => setSelectedItem(row.original)}
+            onEdit={() => handleOpenEdit(row.original)}
             customActions={[
               {
                 label: 'Adjust Stock',
@@ -285,7 +333,7 @@ export const InventoryItemsScreen: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowCreateDrawer(true)}
+              onClick={handleOpenCreate}
               className="text-xs"
               leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
@@ -328,14 +376,16 @@ export const InventoryItemsScreen: React.FC = () => {
         exportFileName="inventory_items.csv"
       />
 
-      {/* 5. Create SKU Drawer */}
+      {/* 5. Create / Edit SKU Drawer */}
       <FormDrawer
         isOpen={showCreateDrawer}
-        onClose={() => setShowCreateDrawer(false)}
-        onSubmit={handleCreateItem}
-        title="Add Inventory Item"
-        subtitle="Register new SKU into central stores catalog"
-        submitText={submitting ? 'Registering...' : 'Register Item'}
+        onClose={() => {
+          setShowCreateDrawer(false);
+          setEditingItem(null);
+        }}
+        onSubmit={handleSaveItem}
+        title={editingItem ? `Edit SKU #${editingItem.itemCode}` : 'Register New Inventory Item'}
+        submitText={submitting ? 'Saving...' : editingItem ? 'Update Item' : 'Create Item'}
         isLoading={submitting}
         width="lg"
       >
@@ -346,7 +396,7 @@ export const InventoryItemsScreen: React.FC = () => {
           </div>
         )}
 
-        <FormSection title="SKU Identification" description="Code, category, and storage bin">
+        <FormSection title="SKU Identification" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Item Code *
@@ -354,10 +404,11 @@ export const InventoryItemsScreen: React.FC = () => {
             <input
               type="text"
               required
+              disabled={!!editingItem}
               placeholder="e.g. LN-BATH-TOWEL-01"
               value={newItem.itemCode}
               onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value.toUpperCase() })}
-              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -394,33 +445,19 @@ export const InventoryItemsScreen: React.FC = () => {
 
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Storage Bin / Warehouse Location
+              Storage Bin Location
             </label>
             <input
               type="text"
               placeholder="e.g. RACK-B-04"
-              value={newItem.locationBin}
+              value={newItem.locationBin || ''}
               onChange={(e) => setNewItem({ ...newItem, locationBin: e.target.value })}
               className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             />
           </div>
         </FormSection>
 
-        <FormSection title="Stock & Valuation Parameters" description="Unit cost, par levels, and initial stock">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
-              Initial Stock Qty *
-            </label>
-            <input
-              type="number"
-              min="0"
-              required
-              value={newItem.currentStock}
-              onChange={(e) => setNewItem({ ...newItem, currentStock: parseInt(e.target.value) || 0 })}
-              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
-            />
-          </div>
-
+        <FormSection title="Stock & Valuation Parameters" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Unit Cost ($) *
@@ -462,6 +499,22 @@ export const InventoryItemsScreen: React.FC = () => {
               className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             />
           </div>
+
+          {!editingItem && (
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Initial Stock Qty *
+              </label>
+              <input
+                type="number"
+                min="0"
+                required
+                value={newItem.currentStock}
+                onChange={(e) => setNewItem({ ...newItem, currentStock: parseInt(e.target.value) || 0 })}
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          )}
         </FormSection>
       </FormDrawer>
 
@@ -533,6 +586,11 @@ export const InventoryItemsScreen: React.FC = () => {
           subtitle={`SKU #${selectedItem.itemCode}`}
           status={selectedItem.currentStock <= selectedItem.reorderLevel ? 'WARNING' : 'AVAILABLE'}
           width="md"
+          onEdit={() => {
+            const item = selectedItem;
+            setSelectedItem(null);
+            handleOpenEdit(item);
+          }}
         >
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">

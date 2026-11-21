@@ -38,6 +38,7 @@ export const VendorDirectoryScreen: React.FC = () => {
 
   // Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [editingVendor, setEditingVendor] = useState<VendorDto | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -75,7 +76,39 @@ export const VendorDirectoryScreen: React.FC = () => {
     fetchVendors();
   }, [fetchVendors]);
 
-  const handleCreateVendor = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingVendor(null);
+    setFormData({
+      vendorCode: '',
+      vendorName: '',
+      contactPerson: '',
+      email: '',
+      phone: '',
+      address: '',
+      taxNumber: '',
+      paymentTermsDays: 30,
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleOpenEdit = (v: VendorDto) => {
+    setEditingVendor(v);
+    setFormData({
+      vendorCode: v.vendorCode,
+      vendorName: v.vendorName,
+      contactPerson: v.contactPerson,
+      email: v.email,
+      phone: v.phone,
+      address: v.address,
+      taxNumber: v.taxNumber || '',
+      paymentTermsDays: v.paymentTermsDays || 30,
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.vendorCode.trim() || !formData.vendorName.trim()) {
       setErrorMsg('Vendor code and company name are required.');
@@ -84,22 +117,33 @@ export const VendorDirectoryScreen: React.FC = () => {
 
     setSubmitting(true);
     setErrorMsg(null);
-    const res = await api.post<VendorDto>('/purchase/vendors', formData);
-    if (res.success) {
-      setShowCreateDrawer(false);
-      setFormData({
-        vendorCode: '',
-        vendorName: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        address: '',
-        taxNumber: '',
-        paymentTermsDays: 30,
+
+    if (editingVendor) {
+      const res = await api.put<VendorDto>(`/purchase/vendors/${editingVendor.id}`, {
+        vendorName: formData.vendorName.trim(),
+        contactPerson: formData.contactPerson.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        address: formData.address.trim(),
+        taxNumber: formData.taxNumber?.trim() || null,
+        paymentTermsDays: Number(formData.paymentTermsDays),
       });
-      fetchVendors();
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setEditingVendor(null);
+        fetchVendors();
+      } else {
+        setErrorMsg(res.message || 'Failed to update vendor.');
+      }
     } else {
-      setErrorMsg(res.message || 'Failed to register vendor.');
+      const res = await api.post<VendorDto>('/purchase/vendors', formData);
+      if (res.success) {
+        setShowCreateDrawer(false);
+        fetchVendors();
+      } else {
+        setErrorMsg(res.message || 'Failed to register vendor.');
+      }
     }
     setSubmitting(false);
   };
@@ -167,6 +211,7 @@ export const VendorDirectoryScreen: React.FC = () => {
         cell: ({ row }) => (
           <RowActions
             onView={() => setSelectedVendor(row.original)}
+            onEdit={() => handleOpenEdit(row.original)}
             isActive={row.original.status === 'ACTIVE'}
             onToggleStatus={() => {}}
           />
@@ -196,7 +241,7 @@ export const VendorDirectoryScreen: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowCreateDrawer(true)}
+              onClick={handleOpenCreate}
               className="text-xs"
               leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
@@ -237,14 +282,16 @@ export const VendorDirectoryScreen: React.FC = () => {
         exportFileName="vendor_directory.csv"
       />
 
-      {/* 5. Create Supplier Drawer */}
+      {/* 5. Create / Edit Supplier Drawer */}
       <FormDrawer
         isOpen={showCreateDrawer}
-        onClose={() => setShowCreateDrawer(false)}
-        onSubmit={handleCreateVendor}
-        title="Register New Vendor"
-        subtitle="Add approved supplier to hotel procurement ledger"
-        submitText={submitting ? 'Registering...' : 'Save Vendor'}
+        onClose={() => {
+          setShowCreateDrawer(false);
+          setEditingVendor(null);
+        }}
+        onSubmit={handleSaveVendor}
+        title={editingVendor ? `Edit Supplier #${editingVendor.vendorCode}` : 'Register New Vendor'}
+        submitText={submitting ? 'Saving...' : editingVendor ? 'Update Supplier' : 'Save Vendor'}
         isLoading={submitting}
         width="lg"
       >
@@ -255,7 +302,7 @@ export const VendorDirectoryScreen: React.FC = () => {
           </div>
         )}
 
-        <FormSection title="Company Profile" description="Legal trade name and vendor code">
+        <FormSection title="Company Profile" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Vendor Code *
@@ -263,10 +310,11 @@ export const VendorDirectoryScreen: React.FC = () => {
             <input
               type="text"
               required
+              disabled={!!editingVendor}
               placeholder="e.g. VND-FB-001"
               value={formData.vendorCode}
               onChange={(e) => setFormData({ ...formData, vendorCode: e.target.value.toUpperCase() })}
-              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -285,7 +333,7 @@ export const VendorDirectoryScreen: React.FC = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Contact & Settlement Terms" description="Point of contact and credit terms">
+        <FormSection title="Contact & Settlement Terms" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Contact Person
@@ -332,13 +380,26 @@ export const VendorDirectoryScreen: React.FC = () => {
             <input
               type="text"
               placeholder="e.g. TAX-993821"
-              value={formData.taxNumber}
+              value={formData.taxNumber || ''}
               onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })}
               className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
             />
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Payment Terms (Days)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={formData.paymentTermsDays}
+              onChange={(e) => setFormData({ ...formData, paymentTermsDays: parseInt(e.target.value) || 30 })}
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+
+          <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Billing &amp; Warehouse Address
             </label>
@@ -362,6 +423,11 @@ export const VendorDirectoryScreen: React.FC = () => {
           subtitle={`Vendor Code: ${selectedVendor.vendorCode}`}
           status={selectedVendor.status}
           width="md"
+          onEdit={() => {
+            const v = selectedVendor;
+            setSelectedVendor(null);
+            handleOpenEdit(v);
+          }}
         >
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">

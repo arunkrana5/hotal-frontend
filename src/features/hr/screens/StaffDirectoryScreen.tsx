@@ -41,6 +41,7 @@ export const StaffDirectoryScreen: React.FC = () => {
 
   // Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeDto | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<EmployeeDto | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -82,7 +83,45 @@ export const StaffDirectoryScreen: React.FC = () => {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingEmployee(null);
+    setNewEmployee({
+      employeeCode: '',
+      firstName: '',
+      lastName: '',
+      departmentCode: 'FO',
+      designation: '',
+      dateOfJoining: new Date().toISOString().split('T')[0],
+      employmentType: 'FULL_TIME',
+      basicSalary: 4000,
+      email: '',
+      phone: '',
+      emergencyContact: '',
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleOpenEdit = (emp: EmployeeDto) => {
+    setEditingEmployee(emp);
+    setNewEmployee({
+      employeeCode: emp.employeeCode,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      departmentCode: emp.departmentCode,
+      designation: emp.designation,
+      dateOfJoining: emp.dateOfJoining,
+      employmentType: emp.employmentType,
+      basicSalary: emp.basicSalary,
+      email: emp.email,
+      phone: emp.phone,
+      emergencyContact: emp.emergencyContact || '',
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmployee.employeeCode.trim() || !newEmployee.firstName.trim() || !newEmployee.lastName.trim()) {
       setErrorMsg('Employee code, first name, and last name are required.');
@@ -91,25 +130,35 @@ export const StaffDirectoryScreen: React.FC = () => {
 
     setSubmitting(true);
     setErrorMsg(null);
-    const res = await api.post<EmployeeDto>('/hr/employees', newEmployee);
-    if (res.success) {
-      setShowCreateDrawer(false);
-      setNewEmployee({
-        employeeCode: '',
-        firstName: '',
-        lastName: '',
-        departmentCode: 'FO',
-        designation: '',
-        dateOfJoining: new Date().toISOString().split('T')[0],
-        employmentType: 'FULL_TIME',
-        basicSalary: 4000,
-        email: '',
-        phone: '',
-        emergencyContact: '',
+
+    if (editingEmployee) {
+      const res = await api.put<EmployeeDto>(`/hr/employees/${editingEmployee.id}`, {
+        firstName: newEmployee.firstName.trim(),
+        lastName: newEmployee.lastName.trim(),
+        departmentCode: newEmployee.departmentCode.trim().toUpperCase(),
+        designation: newEmployee.designation.trim(),
+        employmentType: newEmployee.employmentType.trim().toUpperCase(),
+        basicSalary: Number(newEmployee.basicSalary),
+        email: newEmployee.email.trim().toLowerCase(),
+        phone: newEmployee.phone.trim(),
+        emergencyContact: newEmployee.emergencyContact?.trim() || null,
       });
-      fetchEmployees();
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setEditingEmployee(null);
+        fetchEmployees();
+      } else {
+        setErrorMsg(res.message || 'Failed to update employee.');
+      }
     } else {
-      setErrorMsg(res.message || 'Failed to onboard employee.');
+      const res = await api.post<EmployeeDto>('/hr/employees', newEmployee);
+      if (res.success) {
+        setShowCreateDrawer(false);
+        fetchEmployees();
+      } else {
+        setErrorMsg(res.message || 'Failed to onboard employee.');
+      }
     }
     setSubmitting(false);
   };
@@ -195,6 +244,7 @@ export const StaffDirectoryScreen: React.FC = () => {
         cell: ({ row }) => (
           <RowActions
             onView={() => setSelectedStaff(row.original)}
+            onEdit={() => handleOpenEdit(row.original)}
             isActive={row.original.status !== 'INACTIVE'}
             onToggleStatus={() => {}}
           />
@@ -224,7 +274,7 @@ export const StaffDirectoryScreen: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowCreateDrawer(true)}
+              onClick={handleOpenCreate}
               className="text-xs"
               leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
@@ -288,14 +338,16 @@ export const StaffDirectoryScreen: React.FC = () => {
         exportFileName="staff_directory.csv"
       />
 
-      {/* 5. Onboard Employee Drawer */}
+      {/* 5. Create / Edit Employee Drawer */}
       <FormDrawer
         isOpen={showCreateDrawer}
-        onClose={() => setShowCreateDrawer(false)}
-        onSubmit={handleCreateEmployee}
-        title="Onboard New Employee"
-        subtitle="Create official personnel record and assign department role"
-        submitText={submitting ? 'Onboarding...' : 'Onboard Employee'}
+        onClose={() => {
+          setShowCreateDrawer(false);
+          setEditingEmployee(null);
+        }}
+        onSubmit={handleSaveEmployee}
+        title={editingEmployee ? `Edit Staff Profile #${editingEmployee.employeeCode}` : 'Onboard Staff Member'}
+        submitText={submitting ? 'Saving...' : editingEmployee ? 'Update Staff Profile' : 'Onboard Employee'}
         isLoading={submitting}
         width="lg"
       >
@@ -306,7 +358,7 @@ export const StaffDirectoryScreen: React.FC = () => {
           </div>
         )}
 
-        <FormSection title="Employee Profile" description="Legal name and staff identifier">
+        <FormSection title="Employee Profile" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Staff ID / Employee Code *
@@ -314,10 +366,11 @@ export const StaffDirectoryScreen: React.FC = () => {
             <input
               type="text"
               required
+              disabled={!!editingEmployee}
               placeholder="e.g. EMP-2026-042"
               value={newEmployee.employeeCode}
               onChange={(e) => setNewEmployee({ ...newEmployee, employeeCode: e.target.value.toUpperCase() })}
-              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -386,7 +439,7 @@ export const StaffDirectoryScreen: React.FC = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Employment Contract & Contact" description="Salary, joining date, and contact channels">
+        <FormSection title="Employment Contract & Contact" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Date of Joining
@@ -452,6 +505,11 @@ export const StaffDirectoryScreen: React.FC = () => {
           subtitle={`Staff ID #${selectedStaff.employeeCode} | Department: ${selectedStaff.departmentCode}`}
           status={selectedStaff.status || 'ACTIVE'}
           width="md"
+          onEdit={() => {
+            const emp = selectedStaff;
+            setSelectedStaff(null);
+            handleOpenEdit(emp);
+          }}
         >
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">

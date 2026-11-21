@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/data-table/DataTable';
 import { UniversalSelect } from '@/components/common/UniversalSelect';
 import { StatusBadge } from '@/components/enterprise/StatusBadge';
+import { RowActions, DetailDrawer, FormDrawer, FormSection } from '@/components/enterprise';
 import { api } from '@/services/api';
 import {
   Users,
@@ -72,13 +73,16 @@ export const UserManagementScreen: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [page, setPage] = useState<number>(1);
 
-  // Modals state
-  const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
+  // Modals & Drawers state
+  const [formDrawerOpen, setFormDrawerOpen] = useState<boolean>(false);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [viewingUser, setViewingUser] = useState<UserItem | null>(null);
   const [resetModalUser, setResetModalUser] = useState<UserItem | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // New user form state
+  // User form state
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -169,39 +173,93 @@ export const UserManagementScreen: React.FC = () => {
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingUser(null);
+    setFormData({
+      username: '',
+      email: '',
+      firstName: '',
+      lastName: '',
+      password: '',
+      phoneNumber: '',
+      employeeId: '',
+      selectedRoleIds: roles.length > 0 ? [roles[0].id] : [1],
+    });
+    setFormDrawerOpen(true);
+  };
+
+  const handleOpenEdit = (user: UserItem) => {
+    setEditingUser(user);
+    const matchedRoleIds = roles
+      .filter((r) => user.roles.includes(r.name))
+      .map((r) => r.id);
+
+    setFormData({
+      username: user.username,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      password: '',
+      phoneNumber: user.phoneNumber || '',
+      employeeId: user.employeeId || '',
+      selectedRoleIds: matchedRoleIds.length > 0 ? matchedRoleIds : [1],
+    });
+    setFormDrawerOpen(true);
+  };
+
+  const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username || !formData.email || !formData.password) {
-      setActionMessage({ type: 'error', text: 'Username, email and password are required.' });
-      return;
-    }
+    setIsSaving(true);
+    setActionMessage(null);
+
     try {
-      const res = await api.request('/users', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...formData,
-          roleIds: formData.selectedRoleIds.length > 0 ? formData.selectedRoleIds : [1],
-        }),
-      });
-      if (res.success) {
-        setActionMessage({ type: 'success', text: `User ${formData.username} created successfully.` });
-        setCreateModalOpen(false);
-        setFormData({
-          username: '',
-          email: '',
-          firstName: '',
-          lastName: '',
-          password: '',
-          phoneNumber: '',
-          employeeId: '',
-          selectedRoleIds: [],
+      if (editingUser) {
+        // Edit existing user
+        const res = await api.put<UserItem>(`/users/${editingUser.id}`, {
+          email: formData.email.trim(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phoneNumber: formData.phoneNumber.trim() || null,
+          employeeId: formData.employeeId.trim() || null,
+          roleIds: formData.selectedRoleIds.length > 0 ? formData.selectedRoleIds : undefined,
         });
-        fetchUsers();
+
+        if (res.success) {
+          setActionMessage({ type: 'success', text: `User ${editingUser.username} updated successfully.` });
+          setFormDrawerOpen(false);
+          setEditingUser(null);
+          fetchUsers();
+        } else {
+          setActionMessage({ type: 'error', text: res.message || 'Update failed.' });
+        }
       } else {
-        setActionMessage({ type: 'error', text: res.message || 'Creation failed' });
+        // Create new user
+        if (!formData.username || !formData.email || !formData.password) {
+          setActionMessage({ type: 'error', text: 'Username, email and password are required.' });
+          setIsSaving(false);
+          return;
+        }
+
+        const res = await api.request<UserItem>('/users', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...formData,
+            roleIds: formData.selectedRoleIds.length > 0 ? formData.selectedRoleIds : [1],
+          }),
+        });
+
+        if (res.success) {
+          setActionMessage({ type: 'success', text: `User ${formData.username} created successfully.` });
+          setFormDrawerOpen(false);
+          fetchUsers();
+        } else {
+          setActionMessage({ type: 'error', text: res.message || 'Creation failed' });
+        }
       }
     } catch (err: any) {
-      setActionMessage({ type: 'error', text: err.message || 'Error creating user' });
+      setActionMessage({ type: 'error', text: err.message || 'Error saving user' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -291,26 +349,19 @@ export const UserManagementScreen: React.FC = () => {
         cell: ({ row }) => {
           const u = row.original;
           return (
-            <div className="flex items-center justify-end space-x-1">
-              <button
-                onClick={() => setResetModalUser(u)}
-                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-brand-darkCard text-slate-500 hover:text-brand-primary transition-colors"
-                title="Reset Password"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => handleToggleStatus(u)}
-                className={`p-1 rounded transition-colors ${
-                  u.status === 'Active'
-                    ? 'hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-600'
-                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-400 hover:text-emerald-600'
-                }`}
-                title={u.status === 'Active' ? 'Lock Account' : 'Unlock Account'}
-              >
-                {u.status === 'Active' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+            <RowActions
+              onView={() => setViewingUser(u)}
+              onEdit={() => handleOpenEdit(u)}
+              isActive={u.status === 'Active'}
+              onToggleStatus={() => handleToggleStatus(u)}
+              customActions={[
+                {
+                  label: 'Reset Password',
+                  icon: <KeyRound className="w-3.5 h-3.5" />,
+                  onClick: () => setResetModalUser(u),
+                },
+              ]}
+            />
           );
         },
       },
@@ -361,7 +412,7 @@ export const UserManagementScreen: React.FC = () => {
 
             {activeTab === 'users' && (
               <button
-                onClick={() => setCreateModalOpen(true)}
+                onClick={handleOpenCreate}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-brand-primary text-white hover:bg-brand-primary/95 text-xs font-semibold shadow-soft-xs transition-colors"
               >
                 <UserPlus className="w-3.5 h-3.5" />
@@ -505,118 +556,203 @@ export const UserManagementScreen: React.FC = () => {
         </div>
       )}
 
-      {/* CREATE USER MODAL */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-2xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-brand-border dark:border-brand-darkBorder pb-3">
-              <div className="flex items-center space-x-2">
-                <UserPlus className="w-4 h-4 text-brand-primary" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Create New Operator User</h3>
+      {/* DETAIL DRAWER */}
+      {viewingUser && (
+        <DetailDrawer
+          isOpen={!!viewingUser}
+          onClose={() => setViewingUser(null)}
+          title={viewingUser.fullName || viewingUser.username}
+          status={viewingUser.status}
+          width="md"
+          onEdit={() => {
+            const u = viewingUser;
+            setViewingUser(null);
+            handleOpenEdit(u);
+          }}
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Username</span>
+                <span className="font-mono font-semibold text-brand-text">@{viewingUser.username}</span>
               </div>
-              <button onClick={() => setCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Status</span>
+                <span className="font-semibold text-brand-text">{viewingUser.status}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Email</span>
+                <span className="font-mono text-brand-text">{viewingUser.email}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Phone</span>
+                <span className="font-mono text-brand-text">{viewingUser.phoneNumber || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Staff ID</span>
+                <span className="font-mono text-brand-text">{viewingUser.employeeId || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-brand-muted block">Account Created</span>
+                <span className="font-mono text-brand-muted">{new Date(viewingUser.createdAt).toLocaleDateString()}</span>
+              </div>
             </div>
 
-            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Username *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="e.g. john.doe"
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="john@hotelos.internal"
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                  />
-                </div>
+            <div className="p-3 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface">
+              <span className="text-[10px] font-bold uppercase text-brand-muted block mb-1">Assigned Security Roles</span>
+              <div className="flex flex-wrap gap-1.5">
+                {viewingUser.roles.map((r) => (
+                  <span
+                    key={r}
+                    className="text-[11px] px-2 py-0.5 rounded font-semibold bg-indigo-50 text-brand-primary dark:bg-indigo-950/60 dark:text-[#8495FF] border border-indigo-100 dark:border-indigo-900/40"
+                  >
+                    {r}
+                  </span>
+                ))}
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">First Name</label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    placeholder="John"
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    placeholder="Doe"
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Initial Password *</label>
-                <input
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Min 6 characters"
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50 dark:bg-navy-950"
-                />
-              </div>
-
-              <div>
-                <UniversalSelect
-                  label="Assign Primary Role"
-                  size="sm"
-                  value={formData.selectedRoleIds[0] || ''}
-                  onChange={(val) => {
-                    const id = Number(val);
-                    if (id) setFormData({ ...formData, selectedRoleIds: [id] });
-                  }}
-                  options={roles.map((r) => ({
-                    value: r.id,
-                    label: r.name,
-                  }))}
-                  placeholder="Select Primary Role..."
-                  clearable={false}
-                />
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-brand-border dark:border-brand-darkBorder">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg border border-brand-border text-slate-600 hover:bg-slate-50 dark:text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded-lg bg-brand-primary text-white font-semibold hover:bg-brand-primary/95 shadow-soft-xs"
-                >
-                  Create User
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </DetailDrawer>
       )}
+
+      {/* CREATE / EDIT FORM DRAWER */}
+      <FormDrawer
+        isOpen={formDrawerOpen}
+        onClose={() => {
+          setFormDrawerOpen(false);
+          setEditingUser(null);
+        }}
+        title={editingUser ? `Edit User Profile #${editingUser.id}` : 'Create Operator User'}
+        onSubmit={handleSubmitUser}
+        submitText={isSaving ? 'Saving Profile...' : editingUser ? 'Update User' : 'Create User'}
+        width="lg"
+      >
+        <FormSection title="Account Credentials" columns={2}>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Username *
+            </label>
+            <input
+              type="text"
+              required
+              disabled={!!editingUser}
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              placeholder="e.g. john.doe"
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="john@hotelos.internal"
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+          {!editingUser && (
+            <div className="col-span-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                Initial Password *
+              </label>
+              <input
+                type="password"
+                required
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Minimum 6 characters"
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              />
+            </div>
+          )}
+        </FormSection>
+
+        <FormSection title="Personnel Information" columns={2}>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              First Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              placeholder="John"
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Last Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              placeholder="Doe"
+              className="w-full h-8 px-2.5 text-xs rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Phone Number
+            </label>
+            <input
+              type="text"
+              value={formData.phoneNumber}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              placeholder="+1-555-0199"
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+              Staff ID / Employee Code
+            </label>
+            <input
+              type="text"
+              value={formData.employeeId}
+              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+              placeholder="EMP-0042"
+              className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Security Role Assignment" columns={1}>
+          <div className="grid grid-cols-2 gap-2">
+            {roles.map((r) => {
+              const isChecked = formData.selectedRoleIds.includes(r.id);
+              return (
+                <label
+                  key={r.id}
+                  className="flex items-center space-x-2 p-2 rounded-lg border border-brand-border dark:border-brand-darkBorder bg-slate-50/50 dark:bg-brand-darkCard/40 cursor-pointer hover:bg-slate-100 dark:hover:bg-brand-darkCard transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, selectedRoleIds: [...formData.selectedRoleIds, r.id] });
+                      } else {
+                        setFormData({ ...formData, selectedRoleIds: formData.selectedRoleIds.filter((id) => id !== r.id) });
+                      }
+                    }}
+                    className="rounded text-brand-primary"
+                  />
+                  <span className="text-xs font-medium text-brand-text">{r.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        </FormSection>
+      </FormDrawer>
 
       {/* RESET PASSWORD MODAL */}
       {resetModalUser && (

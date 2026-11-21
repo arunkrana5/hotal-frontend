@@ -47,9 +47,9 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   if (!isOpen) return null;
 
   const widthClasses = {
-    md: 'max-w-md',
-    lg: 'max-w-xl',
-    xl: 'max-w-2xl',
+    md: 'w-full sm:max-w-xl md:max-w-2xl',
+    lg: 'w-full sm:max-w-2xl md:max-w-3xl',
+    xl: 'w-full sm:max-w-3xl md:max-w-4xl',
   };
 
   const currentTab = tabs?.find((t) => t.id === activeTab);
@@ -67,18 +67,15 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-brand-border dark:border-brand-darkBorder shrink-0 bg-brand-secondarySurface dark:bg-brand-darkCard">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center space-x-2">
-                <h2 className="text-base font-bold text-brand-text">{title}</h2>
-                {status && <StatusBadge status={status} variant={statusVariant} />}
-              </div>
-              {subtitle && <p className="text-xs text-brand-muted">{subtitle}</p>}
+        {/* Compact Header */}
+        <div className="px-4 py-2.5 sm:px-5 sm:py-3 border-b border-brand-border dark:border-brand-darkBorder shrink-0 bg-brand-secondarySurface dark:bg-brand-darkCard min-h-[48px]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-2 min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-brand-text truncate">{title}</h2>
+              {status && <StatusBadge status={status} variant={statusVariant} />}
             </div>
 
-            <div className="flex items-center space-x-1.5">
+            <div className="flex items-center space-x-1 shrink-0">
               {onPrint && (
                 <button
                   type="button"

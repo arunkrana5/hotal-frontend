@@ -44,9 +44,9 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
   if (!isOpen) return null;
 
   const widthClasses = {
-    md: 'max-w-md',
-    lg: 'max-w-xl',
-    xl: 'max-w-2xl',
+    md: 'w-full sm:max-w-xl md:max-w-2xl',
+    lg: 'w-full sm:max-w-2xl md:max-w-3xl',
+    xl: 'w-full sm:max-w-3xl md:max-w-4xl',
   };
 
   return (
@@ -62,11 +62,10 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky Header */}
-        <div className="px-5 py-4 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between shrink-0 bg-brand-secondarySurface dark:bg-brand-darkCard">
+        {/* Sticky Compact Header */}
+        <div className="px-5 py-3 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between shrink-0 bg-brand-secondarySurface dark:bg-brand-darkCard min-h-[48px]">
           <div>
             <h2 className="text-sm font-bold text-brand-text">{title}</h2>
-            {subtitle && <p className="text-[11px] text-brand-muted mt-0.5">{subtitle}</p>}
           </div>
 
           <button
@@ -88,7 +87,7 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
         </form>
 
         {/* Sticky Footer */}
-        <div className="px-5 py-3.5 border-t border-brand-border dark:border-brand-darkBorder flex items-center justify-between shrink-0 bg-slate-50/75 dark:bg-brand-darkCard">
+        <div className="px-5 py-3 border-t border-brand-border dark:border-brand-darkBorder flex items-center justify-between shrink-0 bg-slate-50/75 dark:bg-brand-darkCard">
           <div>{secondaryAction}</div>
 
           <div className="flex items-center space-x-2">
@@ -98,7 +97,7 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
               size="sm"
               onClick={onClose}
               disabled={isLoading}
-              className="text-xs"
+              className="text-xs h-[34px]"
             >
               {cancelText}
             </Button>
@@ -109,7 +108,7 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
               size="sm"
               onClick={onSubmit}
               isLoading={isLoading}
-              className="text-xs"
+              className="text-xs h-[34px]"
             >
               {submitText}
             </Button>
@@ -125,16 +124,21 @@ export const FormSection: React.FC<{
   description?: string;
   children: React.ReactNode;
   className?: string;
-}> = ({ title, description, children, className }) => {
+  columns?: 1 | 2 | 3;
+}> = ({ title, children, className, columns = 2 }) => {
+  const colClass =
+    columns === 3
+      ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+      : columns === 1
+      ? 'grid-cols-1'
+      : 'grid-cols-1 sm:grid-cols-2';
+
   return (
-    <div className={cn('space-y-2 pt-2 border-t first:border-0 first:pt-0 border-brand-border dark:border-brand-darkBorder', className)}>
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-          {title}
-        </h4>
-        {description && <p className="text-[11px] text-brand-muted mt-0.5">{description}</p>}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">{children}</div>
+    <div className={cn('space-y-1.5 pt-3 border-t first:border-0 first:pt-0 border-brand-border dark:border-brand-darkBorder', className)}>
+      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+        {title}
+      </h4>
+      <div className={cn('grid gap-3 pt-0.5', colClass)}>{children}</div>
     </div>
   );
 };

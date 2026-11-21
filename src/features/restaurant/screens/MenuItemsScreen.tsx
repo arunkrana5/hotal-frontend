@@ -35,6 +35,7 @@ export const MenuItemsScreen: React.FC = () => {
 
   // Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<MenuItemDto | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItemDto | null>(null);
   const [creating, setCreating] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -70,7 +71,33 @@ export const MenuItemsScreen: React.FC = () => {
     }
   };
 
-  const handleCreateItem = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingItem(null);
+    setItemCode('');
+    setItemName('');
+    setCategory('MAINS');
+    setDescription('');
+    setPrice(25.0);
+    setPrepTime(15);
+    setDietaryType('VEG');
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleOpenEdit = (item: MenuItemDto) => {
+    setEditingItem(item);
+    setItemCode(item.itemCode);
+    setItemName(item.itemName);
+    setCategory(item.category);
+    setDescription(item.description || '');
+    setPrice(item.price);
+    setPrepTime(item.preparationTimeMinutes);
+    setDietaryType(item.dietaryType);
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemCode.trim() || !itemName.trim()) {
       setErrorMsg('Item code and dish name are required.');
@@ -79,25 +106,46 @@ export const MenuItemsScreen: React.FC = () => {
 
     setCreating(true);
     setErrorMsg(null);
-    const res = await api.post('/restaurant/menu', {
-      itemCode,
-      itemName,
-      category,
-      description,
-      price: Number(price),
-      preparationTimeMinutes: Number(prepTime),
-      dietaryType,
-      isAvailable: true,
-    });
 
-    if (res.success) {
-      setShowCreateDrawer(false);
-      setItemCode('');
-      setItemName('');
-      setDescription('');
-      fetchItems();
+    if (editingItem) {
+      const res = await api.put(`/restaurant/menu/${editingItem.id}`, {
+        itemName: itemName.trim(),
+        category,
+        description: description.trim() || null,
+        price: Number(price),
+        preparationTimeMinutes: Number(prepTime),
+        dietaryType,
+        isAvailable: editingItem.isAvailable,
+      });
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setEditingItem(null);
+        fetchItems();
+      } else {
+        setErrorMsg(res.message || 'Failed to update menu item.');
+      }
     } else {
-      setErrorMsg(res.message || 'Failed to create menu item.');
+      const res = await api.post('/restaurant/menu', {
+        itemCode,
+        itemName,
+        category,
+        description,
+        price: Number(price),
+        preparationTimeMinutes: Number(prepTime),
+        dietaryType,
+        isAvailable: true,
+      });
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setItemCode('');
+        setItemName('');
+        setDescription('');
+        fetchItems();
+      } else {
+        setErrorMsg(res.message || 'Failed to create menu item.');
+      }
     }
     setCreating(false);
   };
@@ -207,6 +255,7 @@ export const MenuItemsScreen: React.FC = () => {
         cell: ({ row }) => (
           <RowActions
             onView={() => setSelectedItem(row.original)}
+            onEdit={() => handleOpenEdit(row.original)}
             isActive={row.original.isAvailable}
             onToggleStatus={() => handleToggleAvailability(row.original)}
           />
@@ -236,7 +285,7 @@ export const MenuItemsScreen: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowCreateDrawer(true)}
+              onClick={handleOpenCreate}
               className="text-xs"
               leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
@@ -296,14 +345,16 @@ export const MenuItemsScreen: React.FC = () => {
         exportFileName="restaurant_menu.csv"
       />
 
-      {/* 5. Create Dish Drawer */}
+      {/* 5. Create / Edit Dish Drawer */}
       <FormDrawer
         isOpen={showCreateDrawer}
-        onClose={() => setShowCreateDrawer(false)}
-        onSubmit={handleCreateItem}
-        title="Add New Dish to Menu"
-        subtitle="Configure dish classification, pricing, and prep duration"
-        submitText={creating ? 'Saving...' : 'Add Item'}
+        onClose={() => {
+          setShowCreateDrawer(false);
+          setEditingItem(null);
+        }}
+        onSubmit={handleSaveItem}
+        title={editingItem ? `Edit Dish #${editingItem.itemCode}` : 'Add New Dish to Menu'}
+        submitText={creating ? 'Saving...' : editingItem ? 'Update Dish' : 'Add Item'}
         isLoading={creating}
         width="lg"
       >
@@ -314,7 +365,7 @@ export const MenuItemsScreen: React.FC = () => {
           </div>
         )}
 
-        <FormSection title="Dish Identity" description="Item code and naming">
+        <FormSection title="Dish Identity" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Item Code *
@@ -322,10 +373,11 @@ export const MenuItemsScreen: React.FC = () => {
             <input
               type="text"
               required
+              disabled={!!editingItem}
               placeholder="e.g. MN-STEAK-01"
               value={itemCode}
               onChange={(e) => setItemCode(e.target.value.toUpperCase())}
-              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none"
+              className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-brand-surface dark:bg-brand-darkSurface dark:border-brand-darkBorder text-brand-text focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -389,7 +441,7 @@ export const MenuItemsScreen: React.FC = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Pricing & Kitchen Timing" description="Menu price and preparation duration">
+        <FormSection title="Pricing & Kitchen Timing" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               Menu Price ($) *
@@ -429,6 +481,11 @@ export const MenuItemsScreen: React.FC = () => {
           subtitle={`Code: ${selectedItem.itemCode} | Category: ${selectedItem.category}`}
           status={selectedItem.isAvailable ? 'AVAILABLE' : 'OUTOFORDER'}
           width="md"
+          onEdit={() => {
+            const item = selectedItem;
+            setSelectedItem(null);
+            handleOpenEdit(item);
+          }}
         >
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">

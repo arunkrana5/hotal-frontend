@@ -46,6 +46,7 @@ export const WorkOrdersScreen: React.FC = () => {
 
   // Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
+  const [editingOrder, setEditingOrder] = useState<WorkOrderDto | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrderDto | null>(null);
   const [showResolveDrawer, setShowResolveDrawer] = useState<boolean>(false);
   const { documentNumber: woNumber, isLoading: isWoLoading, refetch: refetchWo } = useDocumentNumber('WORK_ORDER');
@@ -95,7 +96,34 @@ export const WorkOrdersScreen: React.FC = () => {
     fetchAssets();
   }, [fetchOrders]);
 
-  const handleCreateOrder = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingOrder(null);
+    setNewOrder({
+      assetId: undefined,
+      roomId: undefined,
+      departmentCode: 'ENG',
+      issueDescription: '',
+      priority: 'MEDIUM',
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleOpenEdit = (order: WorkOrderDto) => {
+    setEditingOrder(order);
+    setNewOrder({
+      assetId: order.assetId || undefined,
+      roomId: order.roomId || undefined,
+      departmentCode: order.departmentCode,
+      issueDescription: order.issueDescription,
+      priority: order.priority,
+      assignedToUserId: order.assignedToUserId || undefined,
+    });
+    setErrorMsg(null);
+    setShowCreateDrawer(true);
+  };
+
+  const handleSaveOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrder.issueDescription.trim()) {
       setErrorMsg('Issue description is required.');
@@ -104,20 +132,40 @@ export const WorkOrdersScreen: React.FC = () => {
 
     setSubmitting(true);
     setErrorMsg(null);
-    const res = await api.post<WorkOrderDto>('/maintenance/work-orders', newOrder);
-    if (res.success) {
-      setShowCreateDrawer(false);
-      refetchWo();
-      setNewOrder({
-        assetId: undefined,
-        roomId: undefined,
-        departmentCode: 'ENG',
-        issueDescription: '',
-        priority: 'MEDIUM',
+
+    if (editingOrder) {
+      const res = await api.put<WorkOrderDto>(`/maintenance/work-orders/${editingOrder.id}`, {
+        departmentCode: newOrder.departmentCode,
+        issueDescription: newOrder.issueDescription.trim(),
+        priority: newOrder.priority,
+        assignedToUserId: newOrder.assignedToUserId,
+        resolutionNotes: editingOrder.resolutionNotes,
+        totalCost: editingOrder.totalCost,
       });
-      fetchOrders();
+
+      if (res.success) {
+        setShowCreateDrawer(false);
+        setEditingOrder(null);
+        fetchOrders();
+      } else {
+        setErrorMsg(res.message || 'Failed to update work order.');
+      }
     } else {
-      setErrorMsg(res.message || 'Failed to raise work order.');
+      const res = await api.post<WorkOrderDto>('/maintenance/work-orders', newOrder);
+      if (res.success) {
+        setShowCreateDrawer(false);
+        refetchWo();
+        setNewOrder({
+          assetId: undefined,
+          roomId: undefined,
+          departmentCode: 'ENG',
+          issueDescription: '',
+          priority: 'MEDIUM',
+        });
+        fetchOrders();
+      } else {
+        setErrorMsg(res.message || 'Failed to raise work order.');
+      }
     }
     setSubmitting(false);
   };
@@ -214,7 +262,10 @@ export const WorkOrdersScreen: React.FC = () => {
               </Button>
             )}
 
-            <RowActions onView={() => setSelectedOrder(row.original)} />
+            <RowActions
+              onView={() => setSelectedOrder(row.original)}
+              onEdit={() => handleOpenEdit(row.original)}
+            />
           </div>
         ),
       },
@@ -242,7 +293,7 @@ export const WorkOrdersScreen: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowCreateDrawer(true)}
+              onClick={handleOpenCreate}
               className="text-xs"
               leftIcon={<Plus className="w-3.5 h-3.5" />}
             >
@@ -302,14 +353,16 @@ export const WorkOrdersScreen: React.FC = () => {
         exportFileName="work_orders.csv"
       />
 
-      {/* 5. Create Work Order Drawer */}
+      {/* 5. Create / Edit Work Order Drawer */}
       <FormDrawer
         isOpen={showCreateDrawer}
-        onClose={() => setShowCreateDrawer(false)}
-        onSubmit={handleCreateOrder}
-        title="Raise Engineering Work Order"
-        subtitle="Log equipment fault or preventive maintenance request"
-        submitText={submitting ? 'Raising...' : 'Issue Work Order'}
+        onClose={() => {
+          setShowCreateDrawer(false);
+          setEditingOrder(null);
+        }}
+        onSubmit={handleSaveOrder}
+        title={editingOrder ? `Edit Work Order #${editingOrder.workOrderNumber}` : 'Raise Engineering Work Order'}
+        submitText={submitting ? 'Saving...' : editingOrder ? 'Update Work Order' : 'Issue Work Order'}
         isLoading={submitting}
         width="lg"
       >
@@ -320,7 +373,7 @@ export const WorkOrdersScreen: React.FC = () => {
           </div>
         )}
 
-        <FormSection title="Equipment & Priority" description="Select affected asset and urgency">
+        <FormSection title="Equipment & Priority" columns={2}>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
               WO Number (Read-Only)
@@ -328,7 +381,7 @@ export const WorkOrdersScreen: React.FC = () => {
             <input
               type="text"
               readOnly
-              value={woNumber || 'Generating...'}
+              value={editingOrder ? editingOrder.workOrderNumber : (woNumber || 'Generating...')}
               className="w-full h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-brand-border bg-slate-100 dark:bg-brand-darkCard dark:border-brand-darkBorder text-brand-primary dark:text-[#8495FF]"
             />
           </div>
@@ -439,6 +492,11 @@ export const WorkOrdersScreen: React.FC = () => {
           subtitle={`Equipment: ${selectedOrder.assetName || 'General Facility'}`}
           status={selectedOrder.status}
           width="md"
+          onEdit={() => {
+            const wo = selectedOrder;
+            setSelectedOrder(null);
+            handleOpenEdit(wo);
+          }}
         >
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-brand-border dark:border-brand-darkBorder bg-slate-50/70 dark:bg-brand-darkCard grid grid-cols-2 gap-3">
