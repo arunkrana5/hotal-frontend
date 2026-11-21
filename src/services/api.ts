@@ -103,9 +103,14 @@ class ApiClient {
       const data: ApiResponse<T> = await response.json();
       return data;
     } catch (err: any) {
+      const isFetchError = err.message === 'Failed to fetch' || err.name === 'TypeError';
+      const friendlyMessage = isFetchError
+        ? 'Unable to connect to the server. Render cloud instance may be waking up from sleep (~30-50s cold start). Please wait a few seconds and try again.'
+        : (err.message || 'Network error occurred.');
+
       return {
         success: false,
-        message: err.message || 'Network error occurred.',
+        message: friendlyMessage,
         statusCode: 500,
         errors: [err.message],
       };
