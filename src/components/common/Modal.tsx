@@ -88,8 +88,8 @@ export const Modal: React.FC<ModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      style={{ zIndex: 1000 }}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+      style={{ zIndex: 1000, marginTop: 0 }}
+      className="fixed inset-0 z-[1000] !mt-0 !m-0 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) {
           onClose();
@@ -97,8 +97,9 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
+        style={{ marginTop: 0 }}
         className={cn(
-          'w-full rounded-2xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-2xl flex flex-col overflow-hidden max-h-[90vh] animate-slide-up',
+          'w-full !mt-0 rounded-2xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-2xl flex flex-col overflow-hidden max-h-[90vh] animate-slide-up',
           sizeClasses[size] || 'max-w-lg',
           className
         )}

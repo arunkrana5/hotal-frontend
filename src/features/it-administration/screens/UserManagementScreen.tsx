@@ -756,8 +756,16 @@ export const UserManagementScreen: React.FC = () => {
 
       {/* RESET PASSWORD MODAL */}
       {resetModalUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-2xl p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{ zIndex: 1100, marginTop: 0 }}
+          className="fixed inset-0 z-50 !mt-0 !m-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div
+            style={{ marginTop: 0 }}
+            className="w-full !mt-0 max-w-sm bg-brand-surface dark:bg-brand-darkSurface border border-brand-border dark:border-brand-darkBorder rounded-2xl p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between border-b border-brand-border pb-2">
               <div className="flex items-center space-x-2">
                 <KeyRound className="w-4 h-4 text-brand-primary" />

@@ -51,13 +51,16 @@ export const FormDrawer: React.FC<FormDrawerProps> = ({
 
   return (
     <div
-      style={{ zIndex: 1000 }}
-      className="fixed inset-0 z-[1000] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      style={{ zIndex: 1000, marginTop: 0 }}
+      className="fixed inset-0 z-[1000] !mt-0 !m-0 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
+        style={{ marginTop: 0 }}
         className={cn(
-          'w-full h-full bg-brand-surface dark:bg-brand-darkSurface border-l border-brand-border dark:border-brand-darkBorder shadow-2xl flex flex-col animate-in slide-in-from-right duration-200',
+          'w-full h-full !mt-0 bg-brand-surface dark:bg-brand-darkSurface border-l border-brand-border dark:border-brand-darkBorder shadow-2xl flex flex-col animate-in slide-in-from-right duration-200',
           widthClasses[width]
         )}
         onClick={(e) => e.stopPropagation()}

@@ -27,15 +27,17 @@ export const AdvancedFilterDrawer: React.FC<AdvancedFilterDrawerProps> = ({
   return (
     <OverlayPortal>
       <div
-        style={{ zIndex: Z_INDEX.DRAWER_BACKDROP }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+        role="dialog"
+        aria-modal="true"
+        style={{ zIndex: Z_INDEX.DRAWER_BACKDROP, marginTop: 0 }}
+        className="fixed inset-0 !mt-0 !m-0 bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
       >
         <div
-          style={{ zIndex: Z_INDEX.DRAWER_CONTENT }}
-          className="w-full max-w-sm sm:max-w-md h-full bg-brand-surface dark:bg-brand-darkSurface border-l border-brand-border dark:border-brand-darkBorder shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 text-xs text-brand-text"
+          style={{ zIndex: Z_INDEX.DRAWER_CONTENT, marginTop: 0 }}
+          className="w-full !mt-0 max-w-sm sm:max-w-md h-full bg-brand-surface dark:bg-brand-darkSurface border-l border-brand-border dark:border-brand-darkBorder shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 text-xs text-brand-text"
         >
           {/* Drawer Header */}
           <div className="px-5 py-4 border-b border-brand-border dark:border-brand-darkBorder flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-brand-darkCard">

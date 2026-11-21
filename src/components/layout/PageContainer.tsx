@@ -21,7 +21,7 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   };
 
   return (
-    <div className={cn('space-y-2 sm:space-y-0 w-full', maxW[maxWidth], className)} {...props}>
+    <div className={cn('space-y-2 sm:space-y-2 w-full', maxW[maxWidth], className)} {...props}>
       {children}
     </div>
   );

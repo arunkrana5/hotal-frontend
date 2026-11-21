@@ -309,7 +309,7 @@ export const LoginScreen: React.FC = () => {
               className="space-y-1.5"
             >
               <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-                Username or Email
+                Username
               </label>
               <div className="relative group">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-colors">
@@ -317,7 +317,7 @@ export const LoginScreen: React.FC = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="admin or user@hotelos.internal"
+                  placeholder="Enter your username"
                   value={usernameOrEmail}
                   onChange={(e) => setUsernameOrEmail(e.target.value)}
                   disabled={isLoading}

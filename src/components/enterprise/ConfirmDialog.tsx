@@ -41,11 +41,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div
-      style={{ zIndex: 1100 }}
-      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      role="dialog"
+      aria-modal="true"
+      style={{ zIndex: 1100, marginTop: 0 }}
+      className="fixed inset-0 z-[1100] !mt-0 !m-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150"
+        style={{ marginTop: 0 }}
+        className="w-full !mt-0 max-w-md rounded-2xl border border-brand-border dark:border-brand-darkBorder bg-brand-surface dark:bg-brand-darkSurface shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
