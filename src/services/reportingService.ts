@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api, API_BASE_URL } from './api';
 import {
   ExecutiveDashboard,
   NightAuditReport,
@@ -61,7 +61,7 @@ export const reportingService = {
   exportReportCsv: async (reportCode: string, propertyId?: number): Promise<void> => {
     const token = api.getAccessToken();
     const query = propertyId ? `?propertyId=${propertyId}` : '';
-    const url = `http://localhost:5000/api/v1/reports/export/${reportCode}${query}`;
+    const url = `${API_BASE_URL}/reports/export/${reportCode}${query}`;
 
     const res = await fetch(url, {
       method: 'GET',

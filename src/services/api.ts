@@ -1,6 +1,6 @@
 import { ApiResponse, AuthTokenResponse } from '@/types/auth';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+export const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'https://hotelapi-jass.onrender.com/api/v1';
 
 class ApiClient {
   private accessToken: string | null = null;

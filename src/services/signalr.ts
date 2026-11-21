@@ -17,7 +17,7 @@ class SignalRService {
     if (this.isConnecting) return;
 
     this.isConnecting = true;
-    const baseUrl = 'http://localhost:5000';
+    const baseUrl = (import.meta.env.VITE_HUB_URL as string)?.replace(/\/hubs(\/)?$/, '') || 'https://hotelapi-jass.onrender.com';
     const hubUrl = `${baseUrl}/hubs/notifications`;
 
     try {
