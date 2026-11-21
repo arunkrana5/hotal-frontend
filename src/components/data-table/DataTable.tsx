@@ -437,7 +437,7 @@ export function DataTable<TData>({
                 </tr>
               ))
             ) : (
-              <tr>
+              <tr className="empty-state hover:bg-transparent">
                 <td colSpan={columns.length} className="py-12 text-center text-brand-muted">
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <div className="p-3 bg-slate-100 dark:bg-brand-darkCard rounded-full text-slate-400">

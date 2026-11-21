@@ -73,7 +73,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                 </tr>
               ))
             ) : transactions.length === 0 ? (
-              <tr>
+              <tr className="empty-state hover:bg-transparent">
                 <td colSpan={8} className="px-4 py-12 text-center text-brand-muted">
                   <div className="flex flex-col items-center justify-center space-y-1.5">
                     <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 stroke-1" />
