@@ -667,6 +667,157 @@ export const UserManualScreen: React.FC = () => {
             expectedOutput: 'Ticket bumped; waiter runner alert triggers; order marked "Ready for Service".',
             proTip: 'Sort by "Longest Waiting" during peak lunch and dinner rush hours to minimize table wait times.'
           }
+        },
+        {
+          id: 'pos-room-qr',
+          title: 'Room QR Management & Printable Tent Cards',
+          menuPath: 'Restaurant & POS > Room QR Management',
+          route: '/restaurant/qr',
+          targetRole: 'F&B Manager, IT Administrator, Front Office',
+          category: 'Operations',
+          summary: 'Generate, monitor, preview and bulk-print cryptographic QR codes for every hotel room, allowing guests to order in-room dining and request amenities directly from their smartphone cameras.',
+          steps: [
+            {
+              step: 1,
+              title: 'Monitor Room QR Code Roster',
+              description: 'Review configured rooms, active statuses, guest scan counts, and security PIN requirements in the one-record, one-row table.',
+              actionDetail: 'Filter by Active, Revoked, or PIN Protected rooms.'
+            },
+            {
+              step: 2,
+              title: 'Generate Single or Bulk QR Codes',
+              description: 'Click [+ Add Room QR] for an individual room or [Bulk Generate] to provision tokens for all active hotel rooms at once.',
+              actionDetail: 'Cryptographically opaque, non-sequential tokens protect against room-spoofing attacks.'
+            },
+            {
+              step: 3,
+              title: 'Preview & Download High-Res PNGs',
+              description: 'Click [Preview] on any room row to view the QR code canvas, copy the direct guest link, or download a 300 DPI PNG file.',
+              actionDetail: 'Direct guest links allow customer service to assist guests if camera issues arise.'
+            },
+            {
+              step: 4,
+              title: 'Print Physical Nightstand Tent Cards',
+              description: 'Click [Card] on a single room or [Print All Cards] for a multi-room batch sheet formatted for table tent cards and cardstock.',
+              actionDetail: 'Cards include hotel branding, room badge, stylized QR code, and clear scan instructions.'
+            },
+            {
+              step: 5,
+              title: 'Regenerate or Revoke QR Tokens',
+              description: 'If a physical tent card is misplaced or room security is compromised, click [Regenerate] to invalidate the old token immediately, or [Revoke] to shut down ordering.',
+              actionDetail: 'Old QR codes immediately return an invalid token message to any subsequent scans.'
+            }
+          ],
+          concreteExample: {
+            scenario: 'Generate and print table tent card for newly refurbished Executive Suite 402 with optional PIN protection.',
+            inputs: {
+              'Room': 'Room 402 (Executive Suite)',
+              'Security PIN': '4020 (Enabled)',
+              'Card Format': 'Single Luxury Table Tent Card',
+              'Action': 'Generate & Print'
+            },
+            expectedOutput: 'Cryptographic token assigned; QR code preview generated; printable card sent to front desk color printer.',
+            proTip: 'Print cards on laminated cardstock so housekeeping can wipe and sanitize them during room turns without smudging.'
+          }
+        },
+        {
+          id: 'pos-room-orders',
+          title: 'In-Room Dining Orders & Runner Dispatch',
+          menuPath: 'Restaurant & POS > Room Orders',
+          route: '/restaurant/room-orders',
+          targetRole: 'In-Room Dining Captain, Order Taker, Runner',
+          category: 'Operations',
+          summary: 'Real-time operations dashboard for monitoring guest self-service orders from instant placement to kitchen prep, runner dispatch, and room delivery.',
+          steps: [
+            {
+              step: 1,
+              title: 'Receive Real-Time Order Alerts',
+              description: 'New orders placed via room QR appear instantly with pulsing badges, room number badge, guest name, and elapsed timer.',
+              actionDetail: 'Sound and visual pulse alert staff when a new order lands in the queue.'
+            },
+            {
+              step: 2,
+              title: 'Inspect Order Drawer & Instructions',
+              description: 'Click [Manage] to open the full order drawer. Review ordered items, guest preparation notes (e.g. extra spicy, no onions), and delivery instructions (e.g. ring bell twice).',
+              actionDetail: 'Verifies stay attribution: "Stay Verified" badge confirms guest is registered in-house in that room.'
+            },
+            {
+              step: 3,
+              title: 'Advance Order Lifecycle',
+              description: 'Click [Accept Order] to confirm delivery ETA. Click [Send to Kitchen] to route KOT tickets directly to line cooks.',
+              actionDetail: 'Kitchen KDS screen immediately displays room ticket with blue Room Service badge.'
+            },
+            {
+              step: 4,
+              title: 'Dispatch Runner & Mark Delivered',
+              description: 'When kitchen marks ready, assign the runner staff name and click [Dispatch]. Once handed to guest, click [Mark Delivered].',
+              actionDetail: 'If payment method is "Charge to Room", system automatically creates an F&B charge on the active guest folio.'
+            }
+          ],
+          concreteExample: {
+            scenario: 'In-house guest in Room 305 orders late-night dining charged to room folio.',
+            inputs: {
+              'Order #': 'RS-20261128-0003',
+              'Room': 'Room 305 (Stay Verified: Sophia Martinez)',
+              'Items': '1x Wagyu Burger ($28), 1x Truffle Fries ($12), 1x San Pellegrino ($8)',
+              'Total': '$50.40 (incl. 5% tax)',
+              'Payment': 'Charge to Room Folio (Folio #FOL-1049)'
+            },
+            expectedOutput: 'Order accepted with 25 min ETA; KDS notified; runner dispatched; $50.40 posted to Master Folio; order marked Delivered.',
+            proTip: 'Use the elapsed timer badge to identify any in-room orders taking longer than 20 minutes so you can call the kitchen expediters.'
+          }
+        },
+        {
+          id: 'guest-self-service',
+          title: 'Guest Mobile Self-Service Portal',
+          menuPath: 'Guest In-Room Mobile Portal (/guest/q/:token)',
+          route: '/guest/q/demo',
+          targetRole: 'In-House Hotel Guest & Customer Experience',
+          category: 'Operations',
+          summary: 'Zero-install mobile web application that opens when guests scan their in-room QR code with any smartphone camera. Enables browsing menus, ordering food, tracking arrival, and requesting hotel services.',
+          steps: [
+            {
+              step: 1,
+              title: 'Camera Scan & Instant Identification',
+              description: 'Guest points camera at table tent card. Web browser opens directly to verified room portal without installing any native app.',
+              actionDetail: 'System validates room stay, welcomes guest by name, and loads active menus.'
+            },
+            {
+              step: 2,
+              title: 'Browse Menu & Dietary Filters',
+              description: 'Guests filter by categories (Breakfast, Mains, Starters, Desserts, Beverages), toggle Veg Only, or use live search.',
+              actionDetail: 'Displays item prices, preparation times, dietary tags, and rich descriptions.'
+            },
+            {
+              step: 3,
+              title: 'Customize Items & Cart Drawer',
+              description: 'Guest adds items, specifies preparation notes per dish (e.g. dressing on the side), and reviews the itemized bill with 5% VAT.',
+              actionDetail: 'Choose "Charge to Room Folio" or "Pay on Delivery". Add delivery instructions (e.g., leave outside door).'
+            },
+            {
+              step: 4,
+              title: 'Live 5-Stage Order Tracking',
+              description: 'After placing order, screen transitions to live tracker with animated countdown ETA, stage indicator (Placed -> Accepted -> Cooking -> On the Way -> Delivered), and assigned runner.',
+              actionDetail: 'Auto-refreshes every 10 seconds with zero manual refreshing needed.'
+            },
+            {
+              step: 5,
+              title: 'In-Room Hotel Services & Amenities',
+              description: 'Switch to the "Hotel Services" tab to request extra towels, room cleaning, mineral water, luggage assistance, or maintenance with a single tap.',
+              actionDetail: 'Generates real-time service requests directly in the Front Office & Housekeeping queues.'
+            }
+          ],
+          concreteExample: {
+            scenario: 'Guest in Room 102 scans QR code to order breakfast and request 2 extra bath towels.',
+            inputs: {
+              'Scan Device': 'iPhone Camera (Safari Mobile)',
+              'Food Order': '2x Continental Breakfast, 2x Fresh Orange Juice ($44.10)',
+              'Service Request': 'Extra Towels (Housekeeping)',
+              'Payment': 'Charge to Room Folio'
+            },
+            expectedOutput: 'Food order sent to room service kitchen; housekeeping alert generated for towel delivery; guest tracks arrival on phone.',
+            proTip: 'Guests can keep the tracking tab open on their phone while working or relaxing to see when the runner is knocking on the door.'
+          }
         }
       ]
     },
@@ -965,6 +1116,85 @@ export const UserManualScreen: React.FC = () => {
             },
             expectedOutput: 'Visitor logged; badge active; gate pass record archived upon exit.',
             proTip: 'Review the active visitor board 30 minutes before Night Audit to verify all contractor badges are surrendered.'
+          }
+        }
+      ]
+    },
+    {
+      id: 'menus-directory',
+      name: 'System Menus & Navigation',
+      badge: 'Complete Sitemap',
+      icon: ListOrdered,
+      description: 'Comprehensive directory of all 17 system modules, 45+ submenus, URL routes, required roles, and functional workflows.',
+      sections: [
+        {
+          id: 'menu-sitemap-all',
+          title: 'Complete HotelOS Navigation Sitemap & Route Directory',
+          menuPath: 'HotelOS Application-Wide Architecture',
+          route: '/dashboard',
+          targetRole: 'All Staff, Supervisors, General Managers & IT Admins',
+          category: 'IT Engine',
+          summary: 'Complete architectural map of every navigation menu in HotelOS, detailing primary module, child routes, target roles, and core operational responsibilities.',
+          steps: [
+            {
+              step: 1,
+              title: 'Operations & Front Office Hub',
+              description: 'Dashboard (/dashboard), Room Status Grid (/front-office/room-grid), Arrivals (/front-office/arrivals), Departures (/front-office/departures), Folios & Billing (/front-office/folios), and Guest Requests (/front-office/requests).',
+              actionDetail: 'Operated daily by Front Desk Agents, Duty Managers, and Night Auditors.'
+            },
+            {
+              step: 2,
+              title: 'Reservations & Guest Relationship Management',
+              description: 'Bookings List (/reservations/list), Create Reservation (/reservations/new), Availability Matrix (/reservations/matrix), Guest Directory (/guests/list), and VIP / Loyalty Profiles (/guests/loyalty).',
+              actionDetail: 'Used by Central Reservations (CRO), Front Office, and Guest Relations.'
+            },
+            {
+              step: 3,
+              title: 'Housekeeping, Linen & Facilities Hygiene',
+              description: 'Room Status Board (/housekeeping/board), Task Assignments (/housekeeping/tasks), Linen & Laundry Log (/housekeeping/linen).',
+              actionDetail: 'Used by Executive Housekeeper, Floor Supervisors, and Room Attendants.'
+            },
+            {
+              step: 4,
+              title: 'Food & Beverage, In-Room Dining & Kitchen',
+              description: 'Live POS Terminal (/restaurant/pos), Table Management (/restaurant/tables), Menu Items & Pricing (/restaurant/items), Room Orders (/restaurant/room-orders), Room QR Management (/restaurant/qr), and Kitchen KDS Queue (/kitchen/queue).',
+              actionDetail: 'Used by Restaurant Captains, Waiters, In-Room Dining Runners, and Kitchen Chefs.'
+            },
+            {
+              step: 5,
+              title: 'Banquets, Events & Function Spaces',
+              description: 'Event Bookings (/banquet/events) and Halls & Function Spaces (/banquet/spaces).',
+              actionDetail: 'Used by Banquet Sales Managers and Event Coordinators.'
+            },
+            {
+              step: 6,
+              title: 'Enterprise ERP: Procurement, Stores & Financials',
+              description: 'Purchase Requisitions (/purchase/requisitions), Purchase Orders (/purchase/orders), Vendor Directory (/purchase/vendors), Stock Items Master (/inventory/items), Central Stores Ledger (/inventory/stores), General Ledger (/finance/ledger), and Invoices & Settlement (/finance/invoices).',
+              actionDetail: 'Used by Purchase Managers, Storekeepers, Financial Controllers, and Accountants.'
+            },
+            {
+              step: 7,
+              title: 'Human Resources, Facilities Engineering & Security',
+              description: 'Staff Directory (/hr/staff), Maintenance Work Orders (/maintenance/orders), Asset Register (/maintenance/assets), Visitor Gate Pass (/security/visitors), and Incident Reports (/security/incidents).',
+              actionDetail: 'Used by HR Executives, Chief Engineers, Technicians, and Security Officers.'
+            },
+            {
+              step: 8,
+              title: 'Reports, Intelligence & System Control',
+              description: 'Reports Center (/reports/center), Night Audit Ledger (/reports/night-audit), Occupancy Forecast (/reports/forecast), Revenue Trial Balance (/reports/trial-balance), Engine Status (/it/dashboard), Master Data (/it/masters), Workflows (/it/workflows), Dynamic Forms (/it/forms), Numbering Sequences (/it/numbering), System Banners (/it/banners), and Users & Roles (/it/users).',
+              actionDetail: 'Used by General Managers, Financial Auditors, and IT Administrators.'
+            }
+          ],
+          concreteExample: {
+            scenario: 'A new Night Auditor needs to locate the Night Audit Ledger and verify all room folios and F&B bills are balanced.',
+            inputs: {
+              'Starting Route': 'Sidebar Navigation Menu',
+              'Module': 'Reports & Analytics (/reports)',
+              'Submenu': 'Night Audit Ledger (/reports/night-audit)',
+              'Secondary Route': 'Front Office > Guest Folios & Billing (/front-office/folios)'
+            },
+            expectedOutput: 'Auditor navigates directly via sidebar menu or Ctrl+K command palette, audits open folios, and posts daily room revenues.',
+            proTip: 'Press Ctrl+K (or Cmd+K on Mac) anywhere in HotelOS to instantly open the global Command Palette and jump directly to any menu or guide.'
           }
         }
       ]
