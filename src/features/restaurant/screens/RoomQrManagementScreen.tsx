@@ -57,6 +57,18 @@ export const RoomQrManagementScreen: React.FC = () => {
   // QR Canvas ref for PNG download
   const qrCanvasRef = useRef<HTMLDivElement>(null);
 
+  // Dynamic Guest Portal URL resolver (matches live client origin, preventing hardcoded localhost URLs)
+  const getGuestUrl = useCallback((qr: RoomQrCodeDto) => {
+    const customBase = import.meta.env.VITE_GUEST_PORTAL_URL as string | undefined;
+    if (customBase) {
+      return `${customBase.replace(/\/+$/, '')}/${qr.qrToken}`;
+    }
+    if (qr.qrUrl && !qr.qrUrl.includes('localhost')) {
+      return qr.qrUrl;
+    }
+    return `${window.location.origin}/guest/q/${qr.qrToken}`;
+  }, []);
+
   const fetchQrCodes = useCallback(async () => {
     setLoading(true);
     const res = await guestOrderApi.getRoomQrCodes();
@@ -233,29 +245,32 @@ export const RoomQrManagementScreen: React.FC = () => {
     {
       accessorKey: 'qrToken',
       header: 'QR Token & Access URL',
-      cell: ({ row }) => (
-        <div className="flex items-center space-x-2">
-          <code className="text-[11px] font-mono bg-surface-100 dark:bg-surface-800/80 px-1.5 py-0.5 rounded text-surface-700 dark:text-surface-300">
-            {row.original.qrToken.substring(0, 10)}...
-          </code>
-          <button
-            onClick={() => handleCopyLink(row.original.qrUrl)}
-            title="Copy Guest URL"
-            className="p-1 rounded text-surface-400 hover:text-primary-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-          <a
-            href={row.original.qrUrl}
-            target="_blank"
-            rel="noreferrer"
-            title="Open Guest Portal"
-            className="p-1 rounded text-surface-400 hover:text-primary-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const url = getGuestUrl(row.original);
+        return (
+          <div className="flex items-center space-x-2">
+            <code className="text-[11px] font-mono bg-surface-100 dark:bg-surface-800/80 px-1.5 py-0.5 rounded text-surface-700 dark:text-surface-300">
+              {row.original.qrToken.substring(0, 10)}...
+            </code>
+            <button
+              onClick={() => handleCopyLink(url)}
+              title="Copy Guest URL"
+              className="p-1 rounded text-surface-400 hover:text-primary-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              title="Open Guest Portal"
+              className="p-1 rounded text-surface-400 hover:text-primary-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'requirePin',
@@ -470,148 +485,154 @@ export const RoomQrManagementScreen: React.FC = () => {
       </div>
 
       {/* MODAL: PREVIEW QR CODE */}
-      {previewQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-left">
-                <h3 className="text-base font-bold text-surface-900 dark:text-white">
-                  Room {previewQr.roomNumber} QR
-                </h3>
-                <p className="text-xs text-surface-500">In-Room Dining & Services Portal</p>
+      {previewQr && (() => {
+        const previewUrl = getGuestUrl(previewQr);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+            <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-left">
+                  <h3 className="text-base font-bold text-surface-900 dark:text-white">
+                    Room {previewQr.roomNumber} QR
+                  </h3>
+                  <p className="text-xs text-surface-500">In-Room Dining & Services Portal</p>
+                </div>
+                <button
+                  onClick={() => setPreviewQr(null)}
+                  className="p-1 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setPreviewQr(null)}
-                className="p-1 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800"
+
+              <div
+                ref={qrCanvasRef}
+                className="p-4 bg-white rounded-xl border border-surface-200 shadow-inner flex flex-col items-center justify-center mx-auto my-2"
               >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div
-              ref={qrCanvasRef}
-              className="p-4 bg-white rounded-xl border border-surface-200 shadow-inner flex flex-col items-center justify-center mx-auto my-2"
-            >
-              <QRCodeCanvas
-                value={previewQr.qrUrl}
-                size={210}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-
-            <div className="mt-3 text-left bg-surface-50 dark:bg-surface-800/60 p-2.5 rounded-lg border border-surface-200 dark:border-surface-700/60">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 mb-0.5">
-                Portal URL
+                <QRCodeCanvas
+                  value={previewUrl}
+                  size={210}
+                  level="H"
+                  includeMargin={true}
+                />
               </div>
-              <div className="text-xs font-mono text-surface-700 dark:text-surface-300 truncate">
-                {previewQr.qrUrl}
+
+              <div className="mt-3 text-left bg-surface-50 dark:bg-surface-800/60 p-2.5 rounded-lg border border-surface-200 dark:border-surface-700/60">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 mb-0.5">
+                  Portal URL
+                </div>
+                <div className="text-xs font-mono text-surface-700 dark:text-surface-300 truncate">
+                  {previewUrl}
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleCopyLink(previewQr.qrUrl)}
-                className="w-full text-xs"
-              >
-                <Copy className="h-3.5 w-3.5 mr-1" />
-                Copy URL
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleDownloadPng(previewQr.roomNumber)}
-                className="w-full text-xs"
-              >
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Download PNG
-              </Button>
-            </div>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleCopyLink(previewUrl)}
+                  className="w-full text-xs"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  Copy URL
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleDownloadPng(previewQr.roomNumber)}
+                  className="w-full text-xs"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1" />
+                  Download PNG
+                </Button>
+              </div>
 
-            <div className="mt-3">
-              <a
-                href={previewQr.qrUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center text-xs text-primary-600 hover:text-primary-700 font-medium"
-              >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Test scan in browser
-              </a>
+              <div className="mt-3">
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                  Test scan in browser
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: SINGLE ROOM TENT CARD PRINT VIEW */}
-      {printCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-surface-900 dark:text-white">
-                Print Table Tent Card
-              </h3>
-              <button
-                onClick={() => setPrintCard(null)}
-                className="p-1 rounded-lg text-surface-400 hover:text-surface-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Print Card Mockup */}
-            <div className="border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-2xl p-6 bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 text-center shadow-lg">
-              <div className="flex items-center justify-center space-x-2 text-primary-600 dark:text-primary-400 mb-1">
-                <Sparkles className="h-4 w-4" />
-                <span className="text-xs font-bold tracking-widest uppercase">
-                  Grand Hotel & Resort
-                </span>
-              </div>
-              <h4 className="text-xl font-extrabold text-surface-900 dark:text-white mt-1">
-                In-Room Dining & Services
-              </h4>
-              <p className="text-xs text-surface-500 mb-4">
-                Scan with any mobile camera to view our fresh chef menu & place instant room service orders
-              </p>
-
-              <div className="inline-block p-3 bg-white rounded-xl shadow-md border border-surface-200 my-2">
-                <QRCodeSVG value={printCard.qrUrl} size={160} level="H" />
+      {printCard && (() => {
+        const cardUrl = getGuestUrl(printCard);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+            <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-surface-900 dark:text-white">
+                  Print Table Tent Card
+                </h3>
+                <button
+                  onClick={() => setPrintCard(null)}
+                  className="p-1 rounded-lg text-surface-400 hover:text-surface-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <div className="mt-4">
-                <span className="inline-block px-4 py-1.5 rounded-full bg-primary-600 text-white font-black text-sm tracking-wide shadow-xs">
-                  ROOM {printCard.roomNumber}
-                </span>
-              </div>
-              <p className="text-[11px] text-surface-400 mt-3">
-                No app download required • Fast delivery to your room
-              </p>
-            </div>
+              {/* Print Card Mockup */}
+              <div className="border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-2xl p-6 bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 text-center shadow-lg">
+                <div className="flex items-center justify-center space-x-2 text-primary-600 dark:text-primary-400 mb-1">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs font-bold tracking-widest uppercase">
+                    Grand Hotel & Resort
+                  </span>
+                </div>
+                <h4 className="text-xl font-extrabold text-surface-900 dark:text-white mt-1">
+                  In-Room Dining & Services
+                </h4>
+                <p className="text-xs text-surface-500 mb-4">
+                  Scan with any mobile camera to view our fresh chef menu & place instant room service orders
+                </p>
 
-            <div className="flex space-x-2 mt-5">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPrintCard(null)}
-                className="w-1/2 text-xs"
-              >
-                Close
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => window.print()}
-                className="w-1/2 text-xs"
-              >
-                <Printer className="h-3.5 w-3.5 mr-1.5" />
-                Print Card
-              </Button>
+                <div className="inline-block p-3 bg-white rounded-xl shadow-md border border-surface-200 my-2">
+                  <QRCodeSVG value={cardUrl} size={160} level="H" />
+                </div>
+
+                <div className="mt-4">
+                  <span className="inline-block px-4 py-1.5 rounded-full bg-primary-600 text-white font-black text-sm tracking-wide shadow-xs">
+                    ROOM {printCard.roomNumber}
+                  </span>
+                </div>
+                <p className="text-[11px] text-surface-400 mt-3">
+                  No app download required • Fast delivery to your room
+                </p>
+              </div>
+
+              <div className="flex space-x-2 mt-5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPrintCard(null)}
+                  className="w-1/2 text-xs"
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="w-1/2 text-xs"
+                >
+                  <Printer className="h-3.5 w-3.5 mr-1.5" />
+                  Print Card
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: BULK GENERATE */}
       {showBulkModal && (
@@ -805,7 +826,7 @@ export const RoomQrManagementScreen: React.FC = () => {
                     </div>
 
                     <div className="p-2 bg-white rounded-lg border border-surface-200 shadow-xs my-2">
-                      <QRCodeSVG value={qr.qrUrl} size={120} level="M" />
+                      <QRCodeSVG value={getGuestUrl(qr)} size={120} level="M" />
                     </div>
 
                     <div>
