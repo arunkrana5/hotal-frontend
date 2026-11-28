@@ -50,6 +50,8 @@ import { LinenLaundryScreen } from '@/features/housekeeping/screens/LinenLaundry
 import { LivePosTerminalScreen } from '@/features/restaurant/screens/LivePosTerminalScreen';
 import { TableManagementScreen } from '@/features/restaurant/screens/TableManagementScreen';
 import { MenuItemsScreen } from '@/features/restaurant/screens/MenuItemsScreen';
+import { RoomQrManagementScreen } from '@/features/restaurant/screens/RoomQrManagementScreen';
+import { RoomOrdersScreen } from '@/features/restaurant/screens/RoomOrdersScreen';
 import { KitchenKdsScreen } from '@/features/kitchen/screens/KitchenKdsScreen';
 import { BanquetEventsScreen } from '@/features/banquet/screens/BanquetEventsScreen';
 import { BanquetSpacesScreen } from '@/features/banquet/screens/BanquetSpacesScreen';
@@ -76,6 +78,10 @@ import { ReportsCenterScreen } from '@/features/reports/screens/ReportsCenterScr
 // User Manual & Knowledge Base
 import { UserManualScreen } from '@/features/manual/screens/UserManualScreen';
 
+// Guest In-Room Ordering & Self-Service
+import { GuestPortalScreen } from '@/features/guest-portal/screens/GuestPortalScreen';
+import { GuestOrderTrackScreen } from '@/features/guest-portal/screens/GuestOrderTrackScreen';
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -88,6 +94,10 @@ export const AppRoutes: React.FC = () => {
       <Route path="/session-expired" element={<SessionExpiredScreen />} />
       <Route path="/access-denied" element={<AccessDeniedScreen />} />
       <Route path="/account-locked" element={<AccountLockedScreen />} />
+
+      {/* Public In-Room Guest Self-Service Routes */}
+      <Route path="/guest/q/:token" element={<GuestPortalScreen />} />
+      <Route path="/guest/order/:orderNumber" element={<GuestOrderTrackScreen />} />
 
       {/* Protected App Routes */}
       <Route element={<ProtectedRoute />}>
@@ -131,6 +141,8 @@ export const AppRoutes: React.FC = () => {
           <Route path="/restaurant/pos" element={<LivePosTerminalScreen />} />
           <Route path="/restaurant/tables" element={<TableManagementScreen />} />
           <Route path="/restaurant/items" element={<MenuItemsScreen />} />
+          <Route path="/restaurant/room-orders" element={<RoomOrdersScreen />} />
+          <Route path="/restaurant/qr" element={<RoomQrManagementScreen />} />
 
           {/* Kitchen Display System Routes */}
           <Route path="/kitchen" element={<Navigate to="/kitchen/queue" replace />} />
