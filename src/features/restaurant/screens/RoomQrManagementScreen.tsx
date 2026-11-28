@@ -57,16 +57,16 @@ export const RoomQrManagementScreen: React.FC = () => {
   // QR Canvas ref for PNG download
   const qrCanvasRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Guest Portal URL resolver (matches live client origin, preventing hardcoded localhost URLs)
+  // Dynamic Guest Portal URL resolver (points strictly to frontend UI)
   const getGuestUrl = useCallback((qr: RoomQrCodeDto) => {
     const customBase = import.meta.env.VITE_GUEST_PORTAL_URL as string | undefined;
     if (customBase) {
       return `${customBase.replace(/\/+$/, '')}/${qr.qrToken}`;
     }
-    if (qr.qrUrl && !qr.qrUrl.includes('localhost')) {
-      return qr.qrUrl;
+    if (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) {
+      return `${window.location.origin.replace(/\/+$/, '')}/guest/q/${qr.qrToken}`;
     }
-    return `${window.location.origin}/guest/q/${qr.qrToken}`;
+    return `https://hotal-dho2.onrender.com/guest/q/${qr.qrToken}`;
   }, []);
 
   const fetchQrCodes = useCallback(async () => {
